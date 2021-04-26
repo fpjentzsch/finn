@@ -181,7 +181,7 @@ def step_streamline(model: ModelWrapper, cfg: DataflowBuildConfig):
 def step_convert_to_hls(model: ModelWrapper, cfg: DataflowBuildConfig):
     """Convert eligible nodes to `HLSCustomOp` subclasses that represent HLS
     layers. Which nodes and particular configurations can be converted to HLS
-    is limited, see the source code of the `convert_to_hls` module for more. """
+    is limited, see the source code of the `convert_to_hls` module for more."""
 
     mem_mode = cfg.default_mem_mode.value
     if cfg.standalone_thresholds:
@@ -203,6 +203,10 @@ def step_convert_to_hls(model: ModelWrapper, cfg: DataflowBuildConfig):
         model = model.transform(RemoveCNVtoFCFlatten())
     # get rid of Tranpose -> Tranpose identity seq
     model = model.transform(absorb.AbsorbConsecutiveTransposes())
+
+    # DEBUG: deal with Mul node
+    model = model.transform(to_hls.InferChannelwiseLinearLayer())
+
     model = model.transform(GiveUniqueNodeNames())
     model = model.transform(InferDataLayouts())
     return model

@@ -1067,7 +1067,9 @@ class InferChannelwiseLinearLayer(Transformation):
         value. Prefers unsigned integers where possible."""
         vals = np.array(vals)
         for v in vals:
-            assert int(v) == v, "Error float value"
+            # assert int(v) == v, "Error float value"
+            if int(v) != v:
+                return DataType.FLOAT32
 
         for k in DataType.__members__:
             dt = DataType[k]
@@ -1137,8 +1139,8 @@ class InferChannelwiseLinearLayer(Transformation):
                     continue
 
                 # check initializer contains integers as floats
-                if not (ll_cinit.astype(np.int32) == ll_cinit).all():
-                    continue
+                # if not (ll_cinit.astype(np.int32) == ll_cinit).all():
+                # continue
                 # all initializer conditions are met
 
                 # check inputs
@@ -1345,7 +1347,11 @@ class InferGlobalAccPoolLayer(Transformation):
                 )
                 model.graph.value_info.append(mul_value)
                 model.set_initializer(mul_value.name, np.array(1 / (vecs[1] * vecs[2])))
-                new_mul = helper.make_node("Mul", [pool_out, mul_value.name], [result],)
+                new_mul = helper.make_node(
+                    "Mul",
+                    [pool_out, mul_value.name],
+                    [result],
+                )
                 graph.node.insert(insert_point, new_pool)
                 graph.node.insert(insert_point + 1, new_mul)
                 node_ind += 1

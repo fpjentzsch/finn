@@ -289,7 +289,10 @@ class ChannelwiseOp_Batch(HLSCustomOp):
         # fill in TSrcI
         ret["TSrcI"] = "Slice<%s>" % inp_hls_str
         # fill in TDstI
-        ret["TDstI"] = "Slice<%s>" % out_hls_str
+        if out_hls_str == "float":
+            ret["TDstI"] = "Slice<%s, 32>" % out_hls_str
+        else:
+            ret["TDstI"] = "Slice<%s>" % out_hls_str
 
         return ret
 
@@ -316,7 +319,7 @@ class ChannelwiseOp_Batch(HLSCustomOp):
         #     assert (orig_param_vector >= 0).all()
 
         # ensure all thresholds are integer
-        assert (orig_param_vector.astype(np.int32) == orig_param_vector).all()
+        # assert (orig_param_vector.astype(np.int32) == orig_param_vector).all()
         ret = orig_param_vector
 
         assert (
@@ -490,7 +493,9 @@ class ChannelwiseOp_Batch(HLSCustomOp):
         numReps = numInputVectors[0]
         self.code_gen_dict["$DEFINES$"] = [
             """#define NumChannels1 {}\n#define PE1 {}\n#define numReps {}""".format(
-                self.get_nodeattr("NumChannels"), self.get_nodeattr("PE"), numReps,
+                self.get_nodeattr("NumChannels"),
+                self.get_nodeattr("PE"),
+                numReps,
             )
         ]
 
@@ -533,7 +538,9 @@ class ChannelwiseOp_Batch(HLSCustomOp):
         self.code_gen_dict["$DOCOMPUTE$"] = [
             """Thresholding_Batch<{}, NumChannels1, PE1, {}, {}>
             (in0, out, threshs, numReps);""".format(
-                imgdim, tmpl_args["TSrcI"], tmpl_args["TDstI"],
+                imgdim,
+                tmpl_args["TSrcI"],
+                tmpl_args["TDstI"],
             )
         ]
 
