@@ -181,7 +181,7 @@ def step_streamline(model: ModelWrapper, cfg: DataflowBuildConfig):
 def step_convert_to_hls(model: ModelWrapper, cfg: DataflowBuildConfig):
     """Convert eligible nodes to `HLSCustomOp` subclasses that represent HLS
     layers. Which nodes and particular configurations can be converted to HLS
-    is limited, see the source code of the `convert_to_hls` module for more. """
+    is limited, see the source code of the `convert_to_hls` module for more."""
 
     mem_mode = cfg.default_mem_mode.value
     if cfg.standalone_thresholds:
@@ -232,7 +232,11 @@ def step_target_fps_parallelization(model: ModelWrapper, cfg: DataflowBuildConfi
     target_cycles_per_frame = cfg._resolve_cycles_per_frame()
     if target_cycles_per_frame is not None:
         model = model.transform(
-            SetFolding(target_cycles_per_frame, mvau_wwidth_max=cfg.mvau_wwidth_max)
+            SetFolding(
+                target_cycles_per_frame,
+                mvau_wwidth_max=cfg.mvau_wwidth_max,
+                two_pass_relaxation=False,
+            )
         )
     return model
 

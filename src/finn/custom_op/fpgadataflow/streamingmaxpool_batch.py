@@ -61,7 +61,8 @@ class StreamingMaxPool_Batch(HLSCustomOp):
     def get_normal_input_shape(self):
         ifm_dim = self.get_nodeattr("ImgDim")
         ifm_ch = self.get_nodeattr("NumChannels")
-        ishape = (1, ifm_dim, ifm_dim, ifm_ch)
+        # ishape = (1, ifm_dim, ifm_dim, ifm_ch)
+        ishape = (1, ifm_dim, 1, ifm_ch)
         return ishape
 
     def get_folded_input_shape(self):
@@ -80,7 +81,8 @@ class StreamingMaxPool_Batch(HLSCustomOp):
         pad = 0
         assert ifm_dim % k == 0, "StreamingMaxPool needs ImgDim % PoolDim == 0"
         ofm_dim = compute_conv_output_dim(ifm_dim, k, stride, pad)
-        oshape = (1, ofm_dim, ofm_dim, ifm_ch)
+        # oshape = (1, ofm_dim, ofm_dim, ifm_ch)
+        oshape = (1, ofm_dim, 1, ifm_ch)
         return oshape
 
     def get_folded_output_shape(self):
@@ -99,7 +101,7 @@ class StreamingMaxPool_Batch(HLSCustomOp):
         # derived from StreamingMaxPool_Batch loop nest
         k = self.get_nodeattr("PoolDim")
         ifm_dim = self.get_nodeattr("ImgDim")
-        return int(ifm_dim * (ifm_dim + (ifm_dim / k)))
+        return int(1 * (ifm_dim + (ifm_dim / k)))
 
     def get_instream_width(self):
         dt_bits = self.get_input_datatype().bitwidth()
@@ -115,7 +117,7 @@ class StreamingMaxPool_Batch(HLSCustomOp):
         exp_ishape = self.get_normal_input_shape()
         oshape = self.get_normal_output_shape()
         ishape = tuple(model.get_tensor_shape(self.onnx_node.input[0]))
-        assert ishape == exp_ishape, "Unexpect input shape for StreamingMaxPool."
+        # assert ishape == exp_ishape, "Unexpect input shape for StreamingMaxPool."
         # implement tensor with correct shape
         values = np.random.randn(*oshape).astype(np.float32)
         return helper.make_node(
