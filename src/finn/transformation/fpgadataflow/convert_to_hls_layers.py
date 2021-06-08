@@ -714,6 +714,142 @@ class InferQuantizedStreamingFCLayer(Transformation):
         return (model, graph_modified)
 
 
+class InferExperimentalConvAsFC(Transformation):
+    def __init__(self, mem_mode="const"):
+        super().__init__()
+        self.mem_mode = mem_mode
+
+    def apply(self, model):
+        graph = model.graph
+        node_ind = 0
+        graph_modified = False
+        for n in graph.node:
+            node_ind += 1
+            if n.op_type == "Conv":
+                mm_input = n.input[0]
+                mm_weight = n.input[1]
+                mm_output = n.output[0]
+                mm_in_shape = model.get_tensor_shape(mm_input)
+                mm_out_shape = model.get_tensor_shape(mm_output)
+                idt = model.get_tensor_datatype(mm_input)
+                wdt = model.get_tensor_datatype(mm_weight)
+                if idt.is_integer() and wdt.is_integer():
+                    mm_output = n.output[0]
+                    W_conv = model.get_initializer(mm_weight)
+
+                    b, c, h, w = mm_in_shape
+                    out_ch, in_ch, k_h, k_w = W_conv.shape
+
+                    # ignore padding, strides, dilations, group for now
+                    assert k_w == 1 and w == 1, "Only 1d conv supported for now"
+                    k = k_h
+                    l = h
+
+                    assert k == 3, "Only k=3 supported for now"
+                    pad = 2  # assume 1,1 padding for k=3 case
+
+                    # build FC weight matrix from conv weights
+                    mw = l * in_ch
+                    mh = l * out_ch
+                    # ONNX and finn-hlslib make different assumptions about dim order here
+                    # ONNX assumes W has (in, out) shape
+                    # finn-hlslib assumes W has (out, in) shape
+                    W = np.zeros((mh, mw))
+
+                    inner_block = W_conv.transpose((0, 2, 3, 1))
+                    inner_block = inner_block.reshape(out_ch, in_ch * k)
+
+                    offset = in_ch  # * stride
+
+                    edge_coordinate = [1 * out_ch, 0]  # due to padding
+                    for x in range(l - (k - 1)):
+                        slicer = tuple(
+                            slice(edge, edge + i)
+                            for edge, i in zip(edge_coordinate, inner_block.shape)
+                        )
+                        # print(slicer)
+                        # print(W[slicer].shape)
+                        W[slicer] = inner_block
+
+                        edge_coordinate[0] += out_ch
+                        edge_coordinate[1] += in_ch
+
+                    # pad W instead of input
+                    # lower right
+                    inner_block_cutoff = inner_block[:, :-in_ch]
+                    slicer = tuple(
+                        slice(edge, edge + i)
+                        for edge, i in zip(edge_coordinate, inner_block_cutoff.shape)
+                    )
+                    W[slicer] = inner_block_cutoff
+
+                    # upper left
+                    edge_coordinate = [0, 0]
+                    inner_block_cutoff = inner_block[:, in_ch:]
+                    slicer = tuple(
+                        slice(edge, edge + i)
+                        for edge, i in zip(edge_coordinate, inner_block_cutoff.shape)
+                    )
+                    W[slicer] = inner_block_cutoff
+
+                    # convert back to (mw, mw) format
+                    W = W.transpose()
+
+                    model.set_initializer(mm_weight, W)
+
+                    # create node with no parallelization first
+                    pe = 1
+                    simd = 1
+                    assert mh % pe == 0, "Requirement MH divisable by PE is violated."
+                    assert (
+                        mw % simd == 0
+                    ), "Requirement MW divisable by SIMD is violated."
+                    wmem = mw * mh // (pe * simd)
+                    assert (
+                        mw * mh == wmem * pe * simd
+                    ), """Requirement (MW * MH) divisible by
+                    (WMEM * PE * SIMD) is violated."""
+
+                    # do not absorb following threshold for now
+
+                    # make in/out shapes 2D (NC MatMul layout)
+                    mm_in_shape = (b, in_ch * l)
+                    mm_out_shape = (b, out_ch * l)
+
+                    odt = model.get_tensor_datatype(mm_output)
+                    model.set_tensor_shape(mm_input, mm_in_shape)
+                    model.set_tensor_shape(mm_output, mm_out_shape)
+                    # create and insert new StreamingFCLayer node
+                    new_node = helper.make_node(
+                        "StreamingFCLayer_Batch",
+                        [mm_input, mm_weight],
+                        [mm_output],
+                        domain="finn.custom_op.fpgadataflow",
+                        backend="fpgadataflow",
+                        MW=mw,
+                        MH=mh,
+                        SIMD=simd,
+                        PE=pe,
+                        inputDataType=idt.name,
+                        weightDataType=wdt.name,
+                        outputDataType=odt.name,
+                        ActVal=0,
+                        binaryXnorMode=0,
+                        noActivation=1,
+                        numInputVectors=list(mm_in_shape[:-1]),
+                        mem_mode=self.mem_mode,
+                    )
+                    graph.node.insert(node_ind, new_node)
+                    # remove old node
+                    graph.node.remove(n)
+                    graph_modified = True
+        if graph_modified:
+            model = model.transform(MinimizeAccumulatorWidth())
+            model = model.transform(InferShapes())
+            model = model.transform(InferDataTypes())
+        return (model, graph_modified)
+
+
 class InferVVAU(Transformation):
     """Convert MatMul layers with quantized inputs and weights to
     Vector_Vector_Activate_Batch layers, if the sparsity annotation
