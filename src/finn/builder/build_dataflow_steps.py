@@ -46,7 +46,7 @@ from finn.transformation.streamline import Streamline
 from finn.transformation.infer_data_layouts import InferDataLayouts
 from finn.transformation.move_reshape import RemoveCNVtoFCFlatten
 from finn.transformation.lower_convs_to_matmul import LowerConvsToMatMul
-from finn.transformation.streamline.reorder import MakeMaxPoolNHWC
+from finn.transformation.streamline.reorder import MakeMaxPoolNHWC, MoveMulPastFork
 
 from shutil import copy, copytree
 from finn.transformation.fpgadataflow.insert_dwc import InsertDWC
@@ -62,6 +62,7 @@ from finn.transformation.fpgadataflow.make_zynq_proj import ZynqBuild
 from finn.transformation.fpgadataflow.vitis_build import VitisBuild
 from finn.transformation.fpgadataflow.make_pynq_driver import MakePYNQDriver
 from finn.transformation.fpgadataflow.set_folding import SetFolding
+from finn.transformation.fpgadataflow.set_folding_exhaustive import SetFoldingExhaustive
 from finn.transformation.fpgadataflow.create_dataflow_partition import (
     CreateDataflowPartition,
 )
@@ -98,6 +99,10 @@ from finn.transformation.fpgadataflow.set_exec_mode import SetExecMode
 from finn.transformation.fpgadataflow.prepare_rtlsim import PrepareRTLSim
 from finn.core.throughput_test import throughput_test_rtlsim
 from copy import deepcopy
+
+# yolov4
+from finn.core.datatype import DataType
+from finn.transformation.streamline.round_thresholds import RoundAndClipThresholds
 
 
 def verify_step(
@@ -155,6 +160,8 @@ def step_streamline(model: ModelWrapper, cfg: DataflowBuildConfig):
     Streamlining requires careful topology design and cannot be applied to all
     topologies.
     """
+    # yolov4
+    model = model.transform(MoveMulPastFork())
 
     model = model.transform(absorb.AbsorbSignBiasIntoMultiThreshold())
     model = model.transform(Streamline())
@@ -171,6 +178,11 @@ def step_streamline(model: ModelWrapper, cfg: DataflowBuildConfig):
     model = model.transform(InferDataLayouts())
     model = model.transform(RemoveUnusedTensors())
 
+    # yolov4
+    model.set_tensor_datatype("Resize_0_out0", DataType.INT3)
+    model = model.transform(InferDataTypes())
+    model = model.transform(RoundAndClipThresholds())
+
     if VerificationStepType.STREAMLINED_PYTHON in cfg._resolve_verification_steps():
         verify_step(model, cfg, "streamlined_python", need_parent=False)
 
@@ -186,6 +198,12 @@ def step_convert_to_hls(model: ModelWrapper, cfg: DataflowBuildConfig):
     if cfg.standalone_thresholds:
         # doing this first causes all threshold layers to be standalone
         model = model.transform(to_hls.InferThresholdingLayer())
+
+    # debug: only for testing yolov4
+    model = model.transform(to_hls.InferConvInpGen())
+    model = model.transform(to_hls.InferVVAU())
+    model = model.transform(to_hls.InferStreamingMaxPool())
+
     # needed for bipolar MatMul layers
     model = model.transform(to_hls.InferBinaryStreamingFCLayer(mem_mode))
     # needed for non-bipolar MatMul layers
@@ -231,8 +249,14 @@ def step_target_fps_parallelization(model: ModelWrapper, cfg: DataflowBuildConfi
     target_cycles_per_frame = cfg._resolve_cycles_per_frame()
     if target_cycles_per_frame is not None:
         model = model.transform(
-            SetFolding(target_cycles_per_frame, mvau_wwidth_max=cfg.mvau_wwidth_max)
+            SetFolding(
+                target_cycles_per_frame,
+                mvau_wwidth_max=cfg.mvau_wwidth_max,
+                two_pass_relaxation=True,
+            )
+            # SetFoldingExhaustive(target_cycles_per_frame, clk_ns=5, board="ZCU102", mvau_wwidth_max=cfg.mvau_wwidth_max, scale_ratio=0.85, from_scratch=True)
         )
+
     return model
 
 

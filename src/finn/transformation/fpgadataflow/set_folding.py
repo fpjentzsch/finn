@@ -152,10 +152,11 @@ class SetFolding(Transformation):
                     swu_node_inst = getCustomOp(swu_node)
                     pe = node_inst.get_nodeattr("PE")
                     swu_node_inst.set_nodeattr("SIMD", pe)
-                else:
-                    raise Exception(
-                        "Expected SWU on DW op input, found " + swu_node.op_type
-                    )
+                # debug for yolov4:
+                # else:
+                # raise Exception(
+                #    "Expected SWU on DW op input, found " + swu_node.op_type
+                # )
             elif op_type in simd_ops:
                 if op_type == "ConvolutionInputGenerator":
                     depthwise = node_inst.get_nodeattr("depthwise")
