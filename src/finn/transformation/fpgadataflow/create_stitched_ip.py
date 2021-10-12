@@ -120,6 +120,8 @@ class CreateStitchedIP(Transformation):
                 "make_bd_pins_external [get_bd_pins %s/%s]"
                 % (inst_name, clock_intf_name)
             )
+            # debug for fg stitch design
+            # 1st BD node (InpGenMMV) has "aclk"/"aresetn" instead of "ap_clk"/"ap_rst_n"
             self.connect_cmds.append("set_property name ap_clk [get_bd_ports ap_clk_0]")
             self.connect_cmds.append(
                 "make_bd_pins_external [get_bd_pins %s/%s]"
@@ -221,6 +223,9 @@ class CreateStitchedIP(Transformation):
         ip_dirs = ["list"]
         # add RTL streamer IP
         ip_dirs.append("/workspace/finn/finn-rtllib/memstream")
+        # add finn-experimental rtllib_extensions
+        # ip_dirs.append("/workspace/finn-experimental/rtllib_extensions/inputbuf")
+        # ip_dirs.append("/workspace/finn-experimental/rtllib_extensions/swu")
         # ensure that all nodes are fpgadataflow, and that IPs are generated
         for node in model.graph.node:
             assert is_fpgadataflow_node(

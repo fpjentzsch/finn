@@ -333,6 +333,7 @@ def step_set_fifo_depths(model: ModelWrapper, cfg: DataflowBuildConfig):
                 cfg._resolve_fpga_part(),
                 cfg._resolve_hls_clk_period(),
                 vivado_ram_style=cfg.large_fifo_mem_style.value,
+                max_qsrl_depth=1024,  # instead of 256 to avoid "vivado" impl style fifos (needed for rtlsim workaround)
             )
         )
     else:
@@ -423,6 +424,9 @@ def step_measure_rtlsim_performance(model: ModelWrapper, cfg: DataflowBuildConfi
             getCustomOp(dwc_layer).set_nodeattr("impl_style", "hls")
         rtlsim_model = rtlsim_model.transform(PrepareRTLSim())
         rtlsim_model.set_metadata_prop("exec_mode", "rtlsim")
+        rtlsim_model.set_metadata_prop(
+            "rtlsim_trace", "rtlsim_trace.vcd"
+        )  # enable tracing for throughput profiling
         # run with single input to get latency
         rtlsim_perf_dict = throughput_test_rtlsim(rtlsim_model, 1)
         rtlsim_latency = rtlsim_perf_dict["cycles"]

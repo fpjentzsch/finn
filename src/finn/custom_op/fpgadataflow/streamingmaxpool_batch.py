@@ -122,7 +122,11 @@ class StreamingMaxPool_Batch(HLSCustomOp):
             return int(ifm_dim[1] + k[1])
         else:
             # TODO: adjust inaccurate formula
-            return int(ifm_dim[1] * (ifm_dim[1] + (ifm_dim[1] / k[1])))
+            # return int(ifm_dim[1] * (ifm_dim[1] + (ifm_dim[1] / k[1])))
+            ofm_dim = ifm_dim[1] / k[1]
+            return int(
+                ofm_dim + ofm_dim * (ofm_dim * k[1] * k[1] * 2 + k[1] + 1 + ofm_dim * 2)
+            )
 
     def get_instream_width(self):
         dt_bits = self.get_input_datatype().bitwidth()

@@ -14,7 +14,7 @@ gecho () {
 # the repos themselves are cloned in the Dockerfile
 FINN_BASE_COMMIT=ac0b86a63eb937b869bfa453a996a8a8b8506546
 FINN_EXP_COMMIT=e9f97dcdb4db2f889b0f36af079a6a1792b7d4de
-BREVITAS_COMMIT=d7ded80fa9557da2998ea310669edee7fb2d9526
+BREVITAS_COMMIT=e0eaf44fc8e763e870e528b0e47272a61abfed71
 CNPY_COMMIT=4e8810b1a8637695171ed346ce68f6984e585ef4
 HLSLIB_COMMIT=b37337c571b98f40423020bc79f97e189f2661d5
 PYVERILATOR_COMMIT=e2ff74030de3992dcac54bf1b6aad2915946e8cb
@@ -23,13 +23,13 @@ OMX_COMMIT=1bae737669901e762f581af73348332b5c4b2ada
 gecho "Setting up known-good commit versions for FINN dependencies"
 # finn-base
 gecho "finn-base @ $FINN_BASE_COMMIT"
-git -C /workspace/finn-base pull --quiet
-git -C /workspace/finn-base checkout $FINN_BASE_COMMIT --quiet
+#git -C /workspace/finn-base pull --quiet
+#git -C /workspace/finn-base checkout $FINN_BASE_COMMIT --quiet
 pip install --user -e /workspace/finn-base
 # finn-experimental
 gecho "finn-experimental @ $FINN_EXP_COMMIT"
-git -C /workspace/finn-experimental pull --quiet
-git -C /workspace/finn-experimental checkout $FINN_EXP_COMMIT --quiet
+#git -C /workspace/finn-experimental pull --quiet
+#git -C /workspace/finn-experimental checkout $FINN_EXP_COMMIT --quiet
 pip install --user -e /workspace/finn-experimental
 # Brevitas
 gecho "brevitas @ $BREVITAS_COMMIT"
@@ -42,12 +42,12 @@ git -C /workspace/cnpy pull --quiet
 git -C /workspace/cnpy checkout $CNPY_COMMIT --quiet
 # FINN hlslib
 gecho "finn-hlslib @ $HLSLIB_COMMIT"
-git -C /workspace/finn-hlslib pull --quiet
-git -C /workspace/finn-hlslib checkout $HLSLIB_COMMIT --quiet
+#git -C /workspace/finn-hlslib pull --quiet
+#git -C /workspace/finn-hlslib checkout $HLSLIB_COMMIT --quiet
 # PyVerilator
 gecho "PyVerilator @ $PYVERILATOR_COMMIT"
-git -C /workspace/pyverilator pull --quiet
-git -C /workspace/pyverilator checkout $PYVERILATOR_COMMIT --quiet
+#git -C /workspace/pyverilator pull --quiet
+#git -C /workspace/pyverilator checkout $PYVERILATOR_COMMIT --quiet
 pip install --user -e /workspace/pyverilator
 # oh-my-xilinx
 gecho "oh-my-xilinx @ $OMX_COMMIT"

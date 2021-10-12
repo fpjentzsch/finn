@@ -91,17 +91,17 @@ USER $UNAME
 
 # cloning dependency repos (as user)
 # finn-base
-RUN git clone https://github.com/Xilinx/finn-base.git /workspace/finn-base
+#RUN git clone https://github.com/Xilinx/finn-base.git /workspace/finn-base
 # finn-experimental
-RUN git clone https://github.com/Xilinx/finn-experimental.git /workspace/finn-experimental
+#RUN git clone https://github.com/Xilinx/finn-experimental.git /workspace/finn-experimental
 # Brevitas
 RUN git clone https://github.com/Xilinx/brevitas.git /workspace/brevitas
 # CNPY
 RUN git clone https://github.com/rogersce/cnpy.git /workspace/cnpy
 # FINN hlslib
-RUN git clone https://github.com/Xilinx/finn-hlslib.git /workspace/finn-hlslib
+#RUN git clone https://github.com/Xilinx/finn-hlslib.git /workspace/finn-hlslib
 # PyVerilator
-RUN git clone https://github.com/maltanar/pyverilator /workspace/pyverilator
+#RUN git clone https://github.com/maltanar/pyverilator /workspace/pyverilator
 # oh-my-xilinx
 RUN git clone https://bitbucket.org/maltanar/oh-my-xilinx.git /workspace/oh-my-xilinx
 
