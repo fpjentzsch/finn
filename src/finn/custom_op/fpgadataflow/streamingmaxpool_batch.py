@@ -44,6 +44,7 @@ class StreamingMaxPool_Batch(HLSCustomOp):
             "ImgDim": ("ints", True, []),  # [H, W] = [Y, X]
             "PoolDim": ("ints", True, []),  # [H, W] = [Y, X]
             "NumChannels": ("i", True, 0),
+            "M": ("i", False, 1),
             # FINN DataTypes for inputs/outputs
             "dataType": ("s", True, ""),
         }
@@ -85,7 +86,12 @@ class StreamingMaxPool_Batch(HLSCustomOp):
         # even though there is no folding in the current hlslib op,
         # insert a time multiplexing axis to remain compatible with the
         # shapes produced by the rest of the dataflow pipeline
-        ret = list(self.get_normal_input_shape())
+        #ret = list(self.get_normal_input_shape())
+        #ret.insert(-1, 1)
+        ifm_dim_h, ifm_dim_w = self.get_nodeattr("ImgDim")
+        ifm_ch = self.get_nodeattr("NumChannels")
+        M = self.get_nodeattr("M")
+        ret = [1, int(ifm_dim_h/M), ifm_dim_w, ifm_ch*M]
         ret.insert(-1, 1)
         return tuple(ret)
 
@@ -107,11 +113,19 @@ class StreamingMaxPool_Batch(HLSCustomOp):
         # even though there is no folding in the current hlslib op,
         # insert a time multiplexing axis to remain compatible with the
         # shapes produced by the rest of the dataflow pipeline
-        ret = list(self.get_normal_output_shape())
+        M = self.get_nodeattr("M")
+        # Assume pooldim = 2 for special M>1 cases
+        if M > 1:
+            n, h, w, c = self.get_normal_output_shape()
+            ret = [n, int(h/M*2), w, int(c*M/2)]
+        else:
+            ret = list(self.get_normal_output_shape())
         ret.insert(-1, 1)
         return tuple(ret)
 
     def get_number_output_values(self):
+        # doesn't get used within this class
+        # might be wrong
         folded_oshape = self.get_folded_output_shape()
         return np.prod(folded_oshape[:-1])
 
@@ -127,12 +141,18 @@ class StreamingMaxPool_Batch(HLSCustomOp):
     def get_instream_width(self):
         dt_bits = self.get_input_datatype().bitwidth()
         ifm_ch = self.get_nodeattr("NumChannels")
-        in_width = int(dt_bits * ifm_ch)
+        M = self.get_nodeattr("M")
+        in_width = int(dt_bits * ifm_ch * M)
         return in_width
 
     def get_outstream_width(self):
         """For streaming maxpool out stream with is the same as in stream width"""
-        return self.get_instream_width()
+        M = self.get_nodeattr("M")
+        # Assume pooldim = 2 for special M>1 cases
+        if M > 1:
+            return int(self.get_instream_width()/2)
+        else:
+            return self.get_instream_width()
 
     def make_shape_compatible_op(self, model):
         exp_ishape = self.get_normal_input_shape()
@@ -176,7 +196,8 @@ class StreamingMaxPool_Batch(HLSCustomOp):
         self.code_gen_dict["$GLOBALS$"] = ['#include "maxpool.h"']
 
     def defines(self, var):
-        numReps = 2
+        #numReps = 2
+        numReps = np.prod(self.get_folded_output_shape()[:-1])
         ifm_dim, k, ifm_ch = self.get_1d_attrs_normalized()
 
         self.code_gen_dict["$DEFINES$"] = [
@@ -218,6 +239,7 @@ class StreamingMaxPool_Batch(HLSCustomOp):
 
     def docompute(self):
         dtype = self.get_input_datatype()
+        M = self.get_nodeattr("M")
         if dtype.bitwidth() == 1:
             if self.is_1d():
                 raise Exception("Binary 1d MaxPool not implemented on HLS backend")
@@ -227,17 +249,51 @@ class StreamingMaxPool_Batch(HLSCustomOp):
                 "%s<ImgDim, PoolDim, NumChannels>(in0, out, numReps);" % (op)
             ]
         else:
-            if self.is_1d():
-                op = "StreamingMaxPool_Precision_Batch_1d"
+            # only implement special 1D case M=2, pooldim=2
+            if M == 2:
+                self.code_gen_dict["$DOCOMPUTE$"] = [
+                    """
+                    MaxPool_2_MMV_2<{InWidth}, {OutWidth}, NumChannels, {bitwidth}, {dtype_hls}, numReps>(in0, out);""".format(
+                        InWidth = self.get_instream_width(),
+                        OutWidth = self.get_outstream_width(),
+                        bitwidth = self.get_input_datatype().bitwidth(),
+                        dtype_hls = self.get_input_datatype().get_hls_datatype_str()
+                    )
+                ]
+            # only implement special 1D case M=4, pooldim=2
+            elif M == 4:
+                self.code_gen_dict["$DOCOMPUTE$"] = [
+                    """
+                    MaxPool_2_MMV_4<{InWidth}, {OutWidth}, NumChannels, {bitwidth}, {dtype_hls}, numReps>(in0, out);""".format(
+                        InWidth = self.get_instream_width(),
+                        OutWidth = self.get_outstream_width(),
+                        bitwidth = self.get_input_datatype().bitwidth(),
+                        dtype_hls = self.get_input_datatype().get_hls_datatype_str()
+                    )
+                ]
+            # only implement special 1D case M=8, pooldim=2
+            elif M == 8:
+                self.code_gen_dict["$DOCOMPUTE$"] = [
+                    """
+                    MaxPool_2_MMV_8<{InWidth}, {OutWidth}, NumChannels, {bitwidth}, {dtype_hls}, numReps>(in0, out);""".format(
+                        InWidth = self.get_instream_width(),
+                        OutWidth = self.get_outstream_width(),
+                        bitwidth = self.get_input_datatype().bitwidth(),
+                        dtype_hls = self.get_input_datatype().get_hls_datatype_str()
+                    )
+                ]
             else:
-                op = "StreamingMaxPool_Precision_Batch"
-            dtype = self.get_input_datatype()
-            dtype_hls = dtype.get_hls_datatype_str()
-            minval_str = str(int(dtype.min()))
-            self.code_gen_dict["$DOCOMPUTE$"] = [
-                "%s<ImgDim, PoolDim, NumChannels, %s, %s>(in0, out, numReps);"
-                % (op, dtype_hls, minval_str)
-            ]
+                if self.is_1d():
+                    op = "StreamingMaxPool_Precision_Batch_1d"
+                else:
+                    op = "StreamingMaxPool_Precision_Batch"
+                dtype = self.get_input_datatype()
+                dtype_hls = dtype.get_hls_datatype_str()
+                minval_str = str(int(dtype.min()))
+                self.code_gen_dict["$DOCOMPUTE$"] = [
+                    "%s<ImgDim, PoolDim, NumChannels, %s, %s>(in0, out, numReps);"
+                    % (op, dtype_hls, minval_str)
+                ]
 
     def dataoutstrm(self):
         code_gen_dir = self.get_nodeattr("code_gen_dir_cppsim")
@@ -270,11 +326,13 @@ class StreamingMaxPool_Batch(HLSCustomOp):
         self.code_gen_dict["$SAVEASCNPY$"] = []
 
     def blackboxfunction(self):
-        packed_bits = self.get_instream_width()
-        packed_hls_type = "ap_uint<%d>" % packed_bits
+        packed_bits_input = self.get_instream_width()
+        packed_hls_type_input = "ap_uint<%d>" % packed_bits_input
+        packed_bits_output = self.get_outstream_width()
+        packed_hls_type_output = "ap_uint<%d>" % packed_bits_output
         self.code_gen_dict["$BLACKBOXFUNCTION$"] = [
             "void %s(hls::stream<%s > &in0, hls::stream<%s > &out)"
-            % (self.onnx_node.name, packed_hls_type, packed_hls_type)
+            % (self.onnx_node.name, packed_hls_type_input, packed_hls_type_output)
         ]
 
     def pragmas(self):
@@ -317,6 +375,8 @@ class StreamingMaxPool_Batch(HLSCustomOp):
         else:
             export_idt = self.get_input_datatype()
         # no reshaping for input since assuming no folding on input
+        # add again for MMV support:
+        inp = inp.reshape(self.get_folded_input_shape())
         # make copy before saving array
         reshaped_input = inp.copy()
         np.save(os.path.join(code_gen_dir, "input_0.npy"), reshaped_input)

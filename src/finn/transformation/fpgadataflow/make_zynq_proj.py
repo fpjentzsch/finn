@@ -322,7 +322,9 @@ class ZynqBuild(Transformation):
         model = model.transform(InferDataLayouts())
         # prepare at global level, then break up into kernels
         prep_transforms = [
-            InsertIODMA(64),
+            #InsertIODMA(64),
+            # avoid memory bottleneck for MMV accelerators
+            InsertIODMA(128),
             InsertDWC(),
             Floorplan(),
             CreateDataflowPartition(partition_model_dir=self.partition_model_dir),

@@ -67,6 +67,8 @@ class StreamingFCLayer_Batch(HLSCustomOp):
         my_attrs = {
             "PE": ("i", True, 0),
             "SIMD": ("i", True, 0),
+            "M": ("i", False, 1),
+            #"integrate_pool": ("i", False, 0),
             "MW": ("i", True, 0),
             "MH": ("i", True, 0),
             "resType": ("s", False, "lut", {"auto", "lut", "dsp"}),
@@ -407,12 +409,14 @@ class StreamingFCLayer_Batch(HLSCustomOp):
 
     def get_instream_width(self):
         i_bits = self.get_input_datatype().bitwidth()
-        in_width = i_bits * self.get_nodeattr("SIMD")
+        M = self.get_nodeattr("M")
+        in_width = i_bits * self.get_nodeattr("SIMD") * M
         return in_width
 
     def get_outstream_width(self):
         o_bits = self.get_output_datatype().bitwidth()
-        out_width = o_bits * self.get_nodeattr("PE")
+        M = self.get_nodeattr("M")
+        out_width = o_bits * self.get_nodeattr("PE") * M
         return out_width
 
     def get_weightstream_width(self):
@@ -453,11 +457,12 @@ class StreamingFCLayer_Batch(HLSCustomOp):
         pe = self.get_nodeattr("PE")
         sf = mw // simd
         nf = mh // pe
-        vecs = list(self.get_nodeattr("numInputVectors"))
+        vecs = list(self.get_nodeattr("numInputVectors")) # = [N, H, W] = [1, H/M, 1] in 1D MMV case
+        M = self.get_nodeattr("M")
 
         if ind == 0:
             # calculate shape of input 0
-            folded_input_shape = tuple(vecs + [sf, simd])
+            folded_input_shape = tuple(vecs + [sf, simd*M])
         elif ind == 1 and self.get_nodeattr("mem_mode") == "external":
             # calculate shape of input 1 (weights)
             folded_input_shape = tuple(vecs + [sf * nf, simd * pe])
@@ -471,18 +476,29 @@ class StreamingFCLayer_Batch(HLSCustomOp):
         pe = self.get_nodeattr("PE")
         nf = mh // pe
         vecs = list(self.get_nodeattr("numInputVectors"))
-        folded_output_shape = tuple(vecs + [nf, pe])
+        M = self.get_nodeattr("M")
+        folded_output_shape = tuple(vecs + [nf, pe*M])
         return folded_output_shape
 
     def get_normal_input_shape(self):
         mw = self.get_nodeattr("MW")
         vecs = list(self.get_nodeattr("numInputVectors"))
+        M = self.get_nodeattr("M")
+        # try this method: numInputVectors was adjusted to MMV, but normal shape resembles that of non-MMV case
+        # do not apply M when this FCLayer is used for a dense layer (instead of a conv)
+        if len(vecs) > 2:
+            vecs[1] = vecs[1]*M
         normal_input_shape = tuple(vecs + [mw])
         return normal_input_shape
 
     def get_normal_output_shape(self):
         mh = self.get_nodeattr("MH")
         vecs = list(self.get_nodeattr("numInputVectors"))
+        M = self.get_nodeattr("M")
+        # try this method: numInputVectors was adjusted to MMV, but normal shape resembles that of non-MMV case
+        # do not apply M when this FCLayer is used for a dense layer (instead of a conv)
+        if len(vecs) > 2:
+            vecs[1] = vecs[1]*M
         normal_output_shape = tuple(vecs + [mh])
         return normal_output_shape
 
@@ -1022,11 +1038,12 @@ class StreamingFCLayer_Batch(HLSCustomOp):
             assert condition, msg
         mem_mode = self.get_nodeattr("mem_mode")
         numInputVectors = list(self.get_nodeattr("numInputVectors"))
+        M = self.get_nodeattr("M")
         numReps = np.prod(numInputVectors)
         self.code_gen_dict["$DEFINES$"] = [
             """#define MW1 {}\n #define MH1 {}\n
             #define SIMD1 {}\n #define PE1 {}\n #define WMEM1 {}\n
-            #define TMEM1 {}\n #define numReps {}""".format(
+            #define TMEM1 {}\n #define numReps {}\n #define M {}""".format(
                 self.get_nodeattr("MW"),
                 self.get_nodeattr("MH"),
                 self.get_nodeattr("SIMD"),
@@ -1034,6 +1051,7 @@ class StreamingFCLayer_Batch(HLSCustomOp):
                 self.calc_wmem(),
                 self.calc_tmem(),
                 numReps,
+                M
             )
         ]
         if mem_mode == "decoupled" or mem_mode == "external":
@@ -1095,6 +1113,7 @@ class StreamingFCLayer_Batch(HLSCustomOp):
 
     def docompute(self):
         mem_mode = self.get_nodeattr("mem_mode")
+        M = self.get_nodeattr("M")
         map_to_hls_mult_style = {
             "auto": "ap_resource_dflt()",
             "lut": "ap_resource_lut()",
@@ -1108,17 +1127,267 @@ class StreamingFCLayer_Batch(HLSCustomOp):
             threshs = "threshs"
         if mem_mode == "const":
             node = self.onnx_node
-            self.code_gen_dict["$DOCOMPUTE$"] = [
-                """{}<MW1, MH1, SIMD1, PE1, {}, {}, {}>
-                (in0, out, weights, {}, numReps, {});""".format(
-                    node.op_type,
-                    tmpl_args["TSrcI"],
-                    tmpl_args["TDstI"],
-                    tmpl_args["TWeightI"],
-                    threshs,
-                    map_to_hls_mult_style[self.get_nodeattr("resType")],
-                )
-            ]
+            if M > 1:
+                in_width = self.get_instream_width()
+                split_in_width = int(in_width/M)
+                out_width = self.get_outstream_width()
+                split_out_width = int(out_width/M)
+                if M == 2:
+                    # Splitter
+                    self.code_gen_dict["$DOCOMPUTE$"] = [
+                        """
+                        #pragma HLS dataflow
+                        hls::stream<ap_uint<{split_in_width}>> split_in0("mmv_split_in0");
+                        hls::stream<ap_uint<{split_in_width}>> split_in1("mmv_split_in1");
+                        hls::stream<ap_uint<{split_out_width}>> split_out0("mmv_split_out0");
+                        hls::stream<ap_uint<{split_out_width}>> split_out1("mmv_split_out1");
+                        SplitStreams_2<{in_width}, {split_in_width}, numReps>(in0, split_in0, split_in1);""".format(
+                            split_in_width = split_in_width,
+                            split_out_width = split_out_width,
+                            in_width = in_width
+                        )
+                    ]
+                    # Dual StreamingFCLayer_Batch
+                    self.code_gen_dict["$DOCOMPUTE$"] += [
+                        """{}<MW1, MH1, SIMD1, PE1, {}, {}, {}>
+                        (split_in0, split_out0, weights, {}, numReps, {});""".format(
+                            node.op_type,
+                            tmpl_args["TSrcI"],
+                            tmpl_args["TDstI"],
+                            tmpl_args["TWeightI"],
+                            threshs,
+                            map_to_hls_mult_style[self.get_nodeattr("resType")],
+                        )
+                    ]
+                    self.code_gen_dict["$DOCOMPUTE$"] += [
+                        """{}<MW1, MH1, SIMD1, PE1, {}, {}, {}>
+                        (split_in1, split_out1, weights, {}, numReps, {});""".format(
+                            node.op_type,
+                            tmpl_args["TSrcI"],
+                            tmpl_args["TDstI"],
+                            tmpl_args["TWeightI"],
+                            threshs,
+                            map_to_hls_mult_style[self.get_nodeattr("resType")],
+                        )
+                    ]
+                    # Merger
+                    self.code_gen_dict["$DOCOMPUTE$"] += [
+                        """
+                        MergeStreams_2<{split_out_width}, {out_width}, numReps>(split_out0, split_out1, out);""".format(
+                            split_out_width = split_out_width,
+                            out_width = out_width
+                        )
+                    ]
+                elif M == 4:
+                    # Splitter
+                    self.code_gen_dict["$DOCOMPUTE$"] = [
+                        """
+                        #pragma HLS dataflow
+                        hls::stream<ap_uint<{split_in_width}>> split_in0("mmv_split_in0");
+                        hls::stream<ap_uint<{split_in_width}>> split_in1("mmv_split_in1");
+                        hls::stream<ap_uint<{split_in_width}>> split_in2("mmv_split_in2");
+                        hls::stream<ap_uint<{split_in_width}>> split_in3("mmv_split_in3");
+                        hls::stream<ap_uint<{split_out_width}>> split_out0("mmv_split_out0");
+                        hls::stream<ap_uint<{split_out_width}>> split_out1("mmv_split_out1");
+                        hls::stream<ap_uint<{split_out_width}>> split_out2("mmv_split_out2");
+                        hls::stream<ap_uint<{split_out_width}>> split_out3("mmv_split_out3");
+                        SplitStreams_4<{in_width}, {split_in_width}, numReps>(in0, split_in0, split_in1, split_in2, split_in3);""".format(
+                            split_in_width = split_in_width,
+                            split_out_width = split_out_width,
+                            in_width = in_width
+                        )
+                    ]
+                    # Quad StreamingFCLayer_Batch
+                    self.code_gen_dict["$DOCOMPUTE$"] += [
+                        """{}<MW1, MH1, SIMD1, PE1, {}, {}, {}>
+                        (split_in0, split_out0, weights, {}, numReps, {});""".format(
+                            node.op_type,
+                            tmpl_args["TSrcI"],
+                            tmpl_args["TDstI"],
+                            tmpl_args["TWeightI"],
+                            threshs,
+                            map_to_hls_mult_style[self.get_nodeattr("resType")],
+                        )
+                    ]
+                    self.code_gen_dict["$DOCOMPUTE$"] += [
+                        """{}<MW1, MH1, SIMD1, PE1, {}, {}, {}>
+                        (split_in1, split_out1, weights, {}, numReps, {});""".format(
+                            node.op_type,
+                            tmpl_args["TSrcI"],
+                            tmpl_args["TDstI"],
+                            tmpl_args["TWeightI"],
+                            threshs,
+                            map_to_hls_mult_style[self.get_nodeattr("resType")],
+                        )
+                    ]
+                    self.code_gen_dict["$DOCOMPUTE$"] += [
+                        """{}<MW1, MH1, SIMD1, PE1, {}, {}, {}>
+                        (split_in2, split_out2, weights, {}, numReps, {});""".format(
+                            node.op_type,
+                            tmpl_args["TSrcI"],
+                            tmpl_args["TDstI"],
+                            tmpl_args["TWeightI"],
+                            threshs,
+                            map_to_hls_mult_style[self.get_nodeattr("resType")],
+                        )
+                    ]
+                    self.code_gen_dict["$DOCOMPUTE$"] += [
+                        """{}<MW1, MH1, SIMD1, PE1, {}, {}, {}>
+                        (split_in3, split_out3, weights, {}, numReps, {});""".format(
+                            node.op_type,
+                            tmpl_args["TSrcI"],
+                            tmpl_args["TDstI"],
+                            tmpl_args["TWeightI"],
+                            threshs,
+                            map_to_hls_mult_style[self.get_nodeattr("resType")],
+                        )
+                    ]
+                    # Merger
+                    self.code_gen_dict["$DOCOMPUTE$"] += [
+                        """
+                        MergeStreams_4<{split_out_width}, {out_width}, numReps>(split_out0, split_out1, split_out2, split_out3, out);""".format(
+                            split_out_width = split_out_width,
+                            out_width = out_width
+                        )
+                    ]
+                elif M == 8:
+                    # Splitter
+                    self.code_gen_dict["$DOCOMPUTE$"] = [
+                        """
+                        #pragma HLS dataflow
+                        hls::stream<ap_uint<{split_in_width}>> split_in0("mmv_split_in0");
+                        hls::stream<ap_uint<{split_in_width}>> split_in1("mmv_split_in1");
+                        hls::stream<ap_uint<{split_in_width}>> split_in2("mmv_split_in2");
+                        hls::stream<ap_uint<{split_in_width}>> split_in3("mmv_split_in3");
+                        hls::stream<ap_uint<{split_in_width}>> split_in4("mmv_split_in4");
+                        hls::stream<ap_uint<{split_in_width}>> split_in5("mmv_split_in5");
+                        hls::stream<ap_uint<{split_in_width}>> split_in6("mmv_split_in6");
+                        hls::stream<ap_uint<{split_in_width}>> split_in7("mmv_split_in7");
+                        hls::stream<ap_uint<{split_out_width}>> split_out0("mmv_split_out0");
+                        hls::stream<ap_uint<{split_out_width}>> split_out1("mmv_split_out1");
+                        hls::stream<ap_uint<{split_out_width}>> split_out2("mmv_split_out2");
+                        hls::stream<ap_uint<{split_out_width}>> split_out3("mmv_split_out3");
+                        hls::stream<ap_uint<{split_out_width}>> split_out4("mmv_split_out4");
+                        hls::stream<ap_uint<{split_out_width}>> split_out5("mmv_split_out5");
+                        hls::stream<ap_uint<{split_out_width}>> split_out6("mmv_split_out6");
+                        hls::stream<ap_uint<{split_out_width}>> split_out7("mmv_split_out7");
+                        SplitStreams_8<{in_width}, {split_in_width}, numReps>(in0, split_in0, split_in1, split_in2, split_in3, split_in4, split_in5, split_in6, split_in7);""".format(
+                            split_in_width = split_in_width,
+                            split_out_width = split_out_width,
+                            in_width = in_width
+                        )
+                    ]
+                    # Octa StreamingFCLayer_Batch
+                    self.code_gen_dict["$DOCOMPUTE$"] += [
+                        """{}<MW1, MH1, SIMD1, PE1, {}, {}, {}>
+                        (split_in0, split_out0, weights, {}, numReps, {});""".format(
+                            node.op_type,
+                            tmpl_args["TSrcI"],
+                            tmpl_args["TDstI"],
+                            tmpl_args["TWeightI"],
+                            threshs,
+                            map_to_hls_mult_style[self.get_nodeattr("resType")],
+                        )
+                    ]
+                    self.code_gen_dict["$DOCOMPUTE$"] += [
+                        """{}<MW1, MH1, SIMD1, PE1, {}, {}, {}>
+                        (split_in1, split_out1, weights, {}, numReps, {});""".format(
+                            node.op_type,
+                            tmpl_args["TSrcI"],
+                            tmpl_args["TDstI"],
+                            tmpl_args["TWeightI"],
+                            threshs,
+                            map_to_hls_mult_style[self.get_nodeattr("resType")],
+                        )
+                    ]
+                    self.code_gen_dict["$DOCOMPUTE$"] += [
+                        """{}<MW1, MH1, SIMD1, PE1, {}, {}, {}>
+                        (split_in2, split_out2, weights, {}, numReps, {});""".format(
+                            node.op_type,
+                            tmpl_args["TSrcI"],
+                            tmpl_args["TDstI"],
+                            tmpl_args["TWeightI"],
+                            threshs,
+                            map_to_hls_mult_style[self.get_nodeattr("resType")],
+                        )
+                    ]
+                    self.code_gen_dict["$DOCOMPUTE$"] += [
+                        """{}<MW1, MH1, SIMD1, PE1, {}, {}, {}>
+                        (split_in3, split_out3, weights, {}, numReps, {});""".format(
+                            node.op_type,
+                            tmpl_args["TSrcI"],
+                            tmpl_args["TDstI"],
+                            tmpl_args["TWeightI"],
+                            threshs,
+                            map_to_hls_mult_style[self.get_nodeattr("resType")],
+                        )
+                    ]
+                    self.code_gen_dict["$DOCOMPUTE$"] += [
+                        """{}<MW1, MH1, SIMD1, PE1, {}, {}, {}>
+                        (split_in4, split_out4, weights, {}, numReps, {});""".format(
+                            node.op_type,
+                            tmpl_args["TSrcI"],
+                            tmpl_args["TDstI"],
+                            tmpl_args["TWeightI"],
+                            threshs,
+                            map_to_hls_mult_style[self.get_nodeattr("resType")],
+                        )
+                    ]
+                    self.code_gen_dict["$DOCOMPUTE$"] += [
+                        """{}<MW1, MH1, SIMD1, PE1, {}, {}, {}>
+                        (split_in5, split_out5, weights, {}, numReps, {});""".format(
+                            node.op_type,
+                            tmpl_args["TSrcI"],
+                            tmpl_args["TDstI"],
+                            tmpl_args["TWeightI"],
+                            threshs,
+                            map_to_hls_mult_style[self.get_nodeattr("resType")],
+                        )
+                    ]
+                    self.code_gen_dict["$DOCOMPUTE$"] += [
+                        """{}<MW1, MH1, SIMD1, PE1, {}, {}, {}>
+                        (split_in6, split_out6, weights, {}, numReps, {});""".format(
+                            node.op_type,
+                            tmpl_args["TSrcI"],
+                            tmpl_args["TDstI"],
+                            tmpl_args["TWeightI"],
+                            threshs,
+                            map_to_hls_mult_style[self.get_nodeattr("resType")],
+                        )
+                    ]
+                    self.code_gen_dict["$DOCOMPUTE$"] += [
+                        """{}<MW1, MH1, SIMD1, PE1, {}, {}, {}>
+                        (split_in7, split_out7, weights, {}, numReps, {});""".format(
+                            node.op_type,
+                            tmpl_args["TSrcI"],
+                            tmpl_args["TDstI"],
+                            tmpl_args["TWeightI"],
+                            threshs,
+                            map_to_hls_mult_style[self.get_nodeattr("resType")],
+                        )
+                    ]
+                    # Merger
+                    self.code_gen_dict["$DOCOMPUTE$"] += [
+                        """
+                        MergeStreams_8<{split_out_width}, {out_width}, numReps>(split_out0, split_out1, split_out2, split_out3, split_out4, split_out5, split_out6, split_out7, out);""".format(
+                            split_out_width = split_out_width,
+                            out_width = out_width
+                        )
+                    ]
+                else:
+                    raise Exception("""Only M = 1, 2, 4, 8 supported""")
+            else:
+                self.code_gen_dict["$DOCOMPUTE$"] = [
+                    """{}<MW1, MH1, SIMD1, PE1, {}, {}, {}>
+                    (in0, out, weights, {}, numReps, {});""".format(
+                        node.op_type,
+                        tmpl_args["TSrcI"],
+                        tmpl_args["TDstI"],
+                        tmpl_args["TWeightI"],
+                        threshs,
+                        map_to_hls_mult_style[self.get_nodeattr("resType")],
+                    )
+                ]
         elif mem_mode == "decoupled" or mem_mode == "external":
             wdt = self.get_weight_datatype()
             if wdt == DataType["BIPOLAR"]:

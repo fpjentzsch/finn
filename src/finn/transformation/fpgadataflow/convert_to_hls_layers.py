@@ -208,8 +208,16 @@ class InferConvInpGen(Transformation):
                                 with dilation value greater than 1"""
                                 % n.name
                             )
+
+                        # TESTING:
+                        use_rtl_swg = True
+                        if use_rtl_swg:
+                            op_type = "ConvolutionInputGenerator_rtl"
+                        else:
+                            op_type = "ConvolutionInputGenerator1D"
+
                         ConvInpGen_node = helper.make_node(
-                            "ConvolutionInputGenerator1D",
+                            op_type,
                             [ConvInpGen_input],
                             [i2c_output],
                             domain="finn.custom_op.fpgadataflow",
@@ -224,7 +232,7 @@ class InferConvInpGen(Transformation):
                             inputDataType=dt.name,
                             outputDataType=dt.name,
                             depthwise=depthwise,
-                            name="ConvolutionInputGenerator1D_" + n.name,
+                            name=op_type + "_" + n.name,
                         )
                     graph.node.insert(ConvInpGen_node_idx, ConvInpGen_node)
                 # remove old nodes

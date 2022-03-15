@@ -26,6 +26,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import math
 import numpy as np
 import os
 import warnings
@@ -60,6 +61,7 @@ class FMPadding_Batch(HLSCustomOp):
             "NumChannels": ("i", True, 0),
             # SIMD Input parallelism
             "SIMD": ("i", False, 1),
+            "M": ("i", False, 1),
             # FINN input datatype
             "inputDataType": ("s", True, ""),
             # controls distribution of padded pixels
@@ -107,18 +109,25 @@ class FMPadding_Batch(HLSCustomOp):
         normal_ishape = list(self.get_normal_input_shape())
         ifm_ch = self.get_nodeattr("NumChannels")
         simd = self.get_nodeattr("SIMD")
+        M = self.get_nodeattr("M")
         assert ifm_ch % simd == 0, "SIMD must divide input channels"
         fold = int(normal_ishape[-1] / simd)
-        folded_ishape = normal_ishape[:-1] + [fold, simd]
+        # assume 1D case with w=1
+        normal_ishape[1] = int(normal_ishape[1]/M)
+        folded_ishape = normal_ishape[:-1] + [fold, simd*M]
         return tuple(folded_ishape)
 
     def get_folded_output_shape(self):
         normal_oshape = list(self.get_normal_output_shape())
         ifm_ch = self.get_nodeattr("NumChannels")
         simd = self.get_nodeattr("SIMD")
+        M = self.get_nodeattr("M")
         assert ifm_ch % simd == 0, "SIMD must divide input channels"
         fold = int(normal_oshape[-1] / simd)
-        folded_oshape = normal_oshape[:-1] + [fold, simd]
+        # assume 1D case with w=1
+        # round up, in the last cycle don't-care padding might be inserted if out_dim % M != 0
+        normal_oshape[1] = math.ceil(normal_oshape[1]/M)
+        folded_oshape = normal_oshape[:-1] + [fold, simd*M]
         return tuple(folded_oshape)
 
     def make_shape_compatible_op(self, model):
@@ -159,12 +168,14 @@ class FMPadding_Batch(HLSCustomOp):
     def get_instream_width(self):
         ibits = self.get_input_datatype().bitwidth()
         simd = self.get_nodeattr("SIMD")
-        return ibits * simd
+        M = self.get_nodeattr("M")
+        return ibits * simd * M
 
     def get_outstream_width(self):
         obits = self.get_output_datatype().bitwidth()
         simd = self.get_nodeattr("SIMD")
-        return obits * simd
+        M = self.get_nodeattr("M")
+        return obits * simd * M
 
     def get_number_output_values(self):
         folded_oshape = self.get_folded_output_shape()
@@ -177,6 +188,7 @@ class FMPadding_Batch(HLSCustomOp):
         idim_h, idim_w = self.get_nodeattr("ImgDim")
         odim_h, odim_w = self.get_padded_odim()
         pad = self.get_nodeattr("Padding")
+        M = self.get_nodeattr("M")
         pad_h = pad[0] + pad[2]
         pad_w = pad[1] + pad[3]
         is_square = idim_h == idim_w
@@ -208,15 +220,17 @@ class FMPadding_Batch(HLSCustomOp):
                 #define Padding1_y {}\n
                 #define NumChannels1 {}\n
                 #define SIMD1 {}\n
+                #define M1 {}\n
                 #define PaddingStyle1 {}\n
                 #define numReps {}\n
                 """.format(
                     odim_w,
-                    odim_h,
+                    math.ceil(odim_h/M),
                     pad_w,
                     pad_h,
                     self.get_nodeattr("NumChannels"),
                     self.get_nodeattr("SIMD"),
+                    M,
                     self.get_nodeattr("PaddingStyle"),
                     self.get_nodeattr("numInputVectors"),
                 )
@@ -254,6 +268,7 @@ class FMPadding_Batch(HLSCustomOp):
         node = self.onnx_node
 
         idim_h, idim_w = self.get_nodeattr("ImgDim")
+        M = self.get_nodeattr("M")
         is_square = idim_h == idim_w
 
         if is_square:
@@ -265,13 +280,22 @@ class FMPadding_Batch(HLSCustomOp):
                 )
             ]
         else:
-            hls_call = "FMPadding_nonsquare_Batch"
-            self.code_gen_dict["$DOCOMPUTE$"] = [
-                """{}<OutputDim1_x, OutputDim1_y, Padding1_x, Padding1_y, NumChannels1,
-                SIMD1, {}, PaddingStyle1> (in0, out, numReps);""".format(
-                    hls_call, in_t
-                )
-            ]
+            if M > 1:
+                hls_call = "FMPadding_nonsquare_Batch_MMV"
+                self.code_gen_dict["$DOCOMPUTE$"] = [
+                    """{}<OutputDim1_x, OutputDim1_y, Padding1_x, Padding1_y, NumChannels1,
+                    SIMD1, M1, {}, PaddingStyle1> (in0, out, numReps);""".format(
+                        hls_call, in_t
+                    )
+                ]
+            else:
+                hls_call = "FMPadding_nonsquare_Batch"
+                self.code_gen_dict["$DOCOMPUTE$"] = [
+                    """{}<OutputDim1_x, OutputDim1_y, Padding1_x, Padding1_y, NumChannels1,
+                    SIMD1, {}, PaddingStyle1> (in0, out, numReps);""".format(
+                        hls_call, in_t
+                    )
+                ]
 
     def dataoutstrm(self):
         code_gen_dir = self.get_nodeattr("code_gen_dir_cppsim")
@@ -320,9 +344,14 @@ class FMPadding_Batch(HLSCustomOp):
 
     def execute_node(self, context, graph):
         mode = self.get_nodeattr("exec_mode")
+        M = self.get_nodeattr("M")
         node = self.onnx_node
         exp_ishape = self.get_normal_input_shape()
-        exp_oshape = self.get_normal_output_shape()
+        exp_oshape = list(self.get_normal_output_shape())
+        # expect an output shape with a few extra pixels for the odim % M != 0 case
+        # assume 1D case with w=1
+        exp_oshape[1] = math.ceil(exp_oshape[1]/M)*M
+        exp_oshape = tuple(exp_oshape)
         folded_ishape = self.get_folded_input_shape()
         folded_oshape = self.get_folded_output_shape()
 

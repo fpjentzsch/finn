@@ -44,10 +44,13 @@ from finn.transformation.fpgadataflow.prepare_cppsim import PrepareCppSim
 from finn.transformation.fpgadataflow.prepare_ip import PrepareIP
 from finn.transformation.fpgadataflow.prepare_rtlsim import PrepareRTLSim
 from finn.transformation.fpgadataflow.set_exec_mode import SetExecMode
+from finn.transformation.fpgadataflow.create_stitched_ip import CreateStitchedIP
+#from finn.transformation.fpgadataflow.insert_fifo import InsertFIFO
 from finn.transformation.general import GiveUniqueNodeNames
 from finn.transformation.infer_datatypes import InferDataTypes
 from finn.transformation.infer_shapes import InferShapes
 from finn.transformation.lower_convs_to_matmul import LowerConvsToMatMul
+from finn.transformation.streamline.reorder import MakeMaxPoolNHWC
 from finn.util.basic import gen_finn_dt_tensor
 
 
@@ -59,23 +62,21 @@ from finn.util.basic import gen_finn_dt_tensor
 @pytest.mark.parametrize(
     "conv_config",
     [
-        [[0, 0, 0, 0], [4, 1], [1, 1], [1, 1]],
-        [[1, 0, 1, 0], [4, 1], [1, 1], [1, 1]],
-        [[1, 0, 1, 0], [4, 1], [2, 1], [1, 1]],
-        # [[1, 0, 1, 0], [4, 1], [1, 1], [2, 1]]
-    ],
+        #[[0, 0, 0, 0], [3, 1], [1, 1], [1, 1]],
+        [[1, 0, 1, 0], [3, 1], [1, 1], [1, 1]],
+    ]
 )
-@pytest.mark.parametrize("depthwise", [False, True])
-@pytest.mark.parametrize("exec_mode", ["cppsim", "rtlsim"])
+@pytest.mark.parametrize("M", [1, 2, 4, 8])
+@pytest.mark.parametrize("exec_mode", ["rtlsim"])
 @pytest.mark.slow
 @pytest.mark.vivado
-def test_convert_to_hls_1d_conv_layer(conv_config, depthwise, exec_mode):
+def test_convert_to_hls_1d_conv_layer(conv_config, M, exec_mode):
     pad, kernel_size, stride, dilation = conv_config
     np.random.seed(0)
     idt = DataType["UINT4"]
 
-    in_feature_dim_h, in_feature_dim_w = [10, 1]
-    in_chn = 16
+    in_feature_dim_h, in_feature_dim_w = [1024, 1]
+    in_chn = 2
 
     k_h, k_w = kernel_size
     stride_h, stride_w = stride
@@ -83,13 +84,9 @@ def test_convert_to_hls_1d_conv_layer(conv_config, depthwise, exec_mode):
     pad_h = pad[0] + pad[2]
     pad_w = pad[1] + pad[3]
 
-    if depthwise is True:
-        group = out_chn = in_chn
-        conv_param_shape = [out_chn, 1, k_h, k_w]
-    else:
-        group = 1
-        out_chn = 20
-        conv_param_shape = [out_chn, in_chn, k_h, k_w]
+    group = 1
+    out_chn = 8
+    conv_param_shape = [out_chn, in_chn, k_h, k_w]
 
     out_feature_dim_h = compute_conv_output_dim(
         in_feature_dim_h, k_h, stride_h, pad_h, dilation_h
@@ -100,6 +97,7 @@ def test_convert_to_hls_1d_conv_layer(conv_config, depthwise, exec_mode):
 
     input_shape = [1, in_chn, in_feature_dim_h, in_feature_dim_w]
     output_shape = [1, out_chn, out_feature_dim_h, out_feature_dim_w]
+    pool_output_shape = [1, out_chn, int(out_feature_dim_h/2), out_feature_dim_w]
 
     conv_weight_dt = DataType["UINT4"]
 
@@ -110,10 +108,16 @@ def test_convert_to_hls_1d_conv_layer(conv_config, depthwise, exec_mode):
     conv_config["pads"] = pad
     conv_config["strides"] = [stride_h, stride_w]
 
+    pool_config = {}
+    pool_config["strides"] = [2, 1]
+    pool_config["pads"] = [0, 0, 0, 0]
+    pool_config["kernel_shape"] = [2, 1]
+
     top_in = helper.make_tensor_value_info("top_in", TensorProto.FLOAT, input_shape)
-    top_out = helper.make_tensor_value_info("top_out", TensorProto.FLOAT, output_shape)
+    top_out = helper.make_tensor_value_info("top_out", TensorProto.FLOAT, pool_output_shape)
     value_info = [
-        helper.make_tensor_value_info("p1", TensorProto.FLOAT, conv_param_shape)
+        helper.make_tensor_value_info("p1", TensorProto.FLOAT, conv_param_shape),
+        helper.make_tensor_value_info("conv_out", TensorProto.FLOAT, output_shape)
     ]
 
     modelproto = helper.make_model(
@@ -123,66 +127,103 @@ def test_convert_to_hls_1d_conv_layer(conv_config, depthwise, exec_mode):
             outputs=[top_out],
             value_info=value_info,
             nodes=[
-                helper.make_node("Conv", ["top_in", "p1"], ["top_out"], **conv_config)
+                helper.make_node("Conv", ["top_in", "p1"], ["conv_out"], **conv_config),
+                helper.make_node("MaxPool", ["conv_out"], ["top_out"], **pool_config)
             ],
         )
     )
 
     model = ModelWrapper(modelproto)
     model.set_tensor_datatype("top_in", idt)
+    model.set_tensor_datatype("conv_out", idt)
     model.set_tensor_datatype("top_out", idt)
     model.set_tensor_datatype("p1", conv_weight_dt)
     model.set_initializer("p1", gen_finn_dt_tensor(conv_weight_dt, conv_param_shape))
 
     model = model.transform(InferShapes())
     model = model.transform(InferDataTypes())
-
     new_model = model.transform(LowerConvsToMatMul())
+    new_model = new_model.transform(MakeMaxPoolNHWC())
     new_model = new_model.transform(to_hls.InferConvInpGen())
-    if depthwise is True:
-        new_model = new_model.transform(to_hls.InferVVAU())
-    else:
-        new_model = new_model.transform(to_hls.InferQuantizedStreamingFCLayer())
-        fc_node = new_model.get_nodes_by_op_type("StreamingFCLayer_Batch")[0]
-        fc_inst = getCustomOp(fc_node)
-        mw = fc_inst.get_nodeattr("MW")
-        mh = fc_inst.get_nodeattr("MH")
-        pe_cands = list(filter(lambda x: mh % x == 0, range(2, mh + 1)))
-        simd_cands = list(filter(lambda x: mw % x == 0, range(2, mw + 1)))
-        fc_inst.set_nodeattr("PE", pe_cands[0])
-        fc_inst.set_nodeattr("SIMD", simd_cands[0])
+    new_model = new_model.transform(to_hls.InferStreamingMaxPool())
+    new_model = new_model.transform(to_hls.InferQuantizedStreamingFCLayer())
+    
+    pad_node = new_model.get_nodes_by_op_type("FMPadding_Batch")[0]
+    pad_inst = getCustomOp(pad_node)
+    pad_inst.set_nodeattr("M", M)
+
+    swg_node = new_model.get_nodes_by_op_type("ConvolutionInputGenerator_rtl")[0]
+    swg_inst = getCustomOp(swg_node)
+    swg_inst.set_nodeattr("M", M)
+
+    fc_node = new_model.get_nodes_by_op_type("StreamingFCLayer_Batch")[0]
+    fc_inst = getCustomOp(fc_node)
+    fc_inst.set_nodeattr("PE", out_chn) #max
+    fc_inst.set_nodeattr("SIMD", in_chn*k_h) #max
+    fc_inst.set_nodeattr("M", M)
+    fc_inst.set_nodeattr("numInputVectors", [1, int(out_feature_dim_h/M), 1]) # ToDo: should be adjusted automatically
+    #fc_inst.set_nodeattr("rtlsim_trace", "/workspace/finn/test_fc.vcd")
+
+    pool_node = new_model.get_nodes_by_op_type("StreamingMaxPool_Batch")[0]
+    pool_inst = getCustomOp(pool_node)
+    pool_inst.set_nodeattr("M", M)
 
     new_model = new_model.transform(GiveUniqueNodeNames())
     new_model = new_model.transform(InferShapes())
     new_model = new_model.transform(InferDataTypes())
+
+    #Debug:
+    model.save("1D_Conv_MMV_test_before.onnx")
+    new_model.save("1D_Conv_MMV_test_after.onnx")
 
     if exec_mode == "cppsim":
         new_model = new_model.transform(PrepareCppSim())
         new_model = new_model.transform(CompileCppSim())
         new_model = new_model.transform(SetExecMode("cppsim"))
     elif exec_mode == "rtlsim":
+        # Stitched rtlsim
+        #model = model.transform(InsertFIFO(create_shallow_fifos=True))
+
         new_model = new_model.transform(SetExecMode("rtlsim"))
         new_model = new_model.transform(GiveUniqueNodeNames())
         new_model = new_model.transform(PrepareIP("xc7z020clg400-1", 5))
         new_model = new_model.transform(HLSSynthIP())
         new_model = new_model.transform(PrepareRTLSim())
+
+        # Stitched rtlsim
+        #new_model = new_model.transform(CreateStitchedIP("xc7z020clg400-1", 5))
+        #new_model.set_metadata_prop("exec_mode", "rtlsim")
     else:
         raise Exception("Unknown exec_mode")
 
     x = gen_finn_dt_tensor(idt, input_shape)
     inp_dict = {model.graph.input[0].name: x}
-    assert oxe.compare_execution(model, new_model, inp_dict)
 
-    if pad_h == 1 and pad_w == 1:
-        padding_node = new_model.get_nodes_by_op_type("FMPadding_Batch")[0]
-        padding_inst = getCustomOp(padding_node)
-        assert padding_inst.get_nodeattr("SIMD") == in_chn
+    #assert oxe.compare_execution(model, new_model, inp_dict)
+    y_expected = oxe.execute_onnx(model, inp_dict)["top_out"]
+    out_dict = oxe.execute_onnx(new_model, inp_dict, return_full_exec_context=True, start_node=None, end_node=None)
+    y_produced = out_dict["top_out"]
 
-    if depthwise is True and exec_mode == "rtlsim":
-        node = new_model.get_nodes_by_op_type("Vector_Vector_Activate_Batch")[0]
-        inst = getCustomOp(node)
-        cycles_rtlsim = inst.get_nodeattr("cycles_rtlsim")
-        exp_cycles_dict = new_model.analysis(exp_cycles_per_layer)
-        exp_cycles = exp_cycles_dict[node.name]
-        assert np.isclose(exp_cycles, cycles_rtlsim, atol=11)
-        assert exp_cycles != 0
+    #DEBUG
+    print("-------expected:")
+    print(y_expected)
+    print("--------produced:")
+    print(y_produced)
+    print("-----------full output dict:")
+    print(out_dict)
+
+    assert (y_produced == y_expected).all()
+
+    #if pad_h == 1 and pad_w == 1:
+    #    padding_node = new_model.get_nodes_by_op_type("FMPadding_Batch")[0]
+    #    padding_inst = getCustomOp(padding_node)
+    #    assert padding_inst.get_nodeattr("SIMD") == in_chn
+
+    #if depthwise is True and exec_mode == "rtlsim":
+    #    node = new_model.get_nodes_by_op_type("Vector_Vector_Activate_Batch")[0]
+    #    inst = getCustomOp(node)
+    #    cycles_rtlsim = inst.get_nodeattr("cycles_rtlsim")
+    #    exp_cycles_dict = new_model.analysis(exp_cycles_per_layer)
+    #    exp_cycles = exp_cycles_dict[node.name]
+    #    assert np.isclose(exp_cycles, cycles_rtlsim, atol=11)
+    #    assert exp_cycles != 0
