@@ -257,7 +257,7 @@ class ConvolutionInputGenerator_rtl(HLSCustomOp):
             )
         else:
             buffer_depth = 0
-            raise Exception("Requested impl. style not implemented")
+            #TODO: move here
         return buffer_depth
 
     def get_exp_cycles(self):
