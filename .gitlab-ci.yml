@@ -1,7 +1,8 @@
-test:
-  stage: build
+Quicktest Singularity Image:
+  stage: test
   variables:
-    SCHEDULER_PARAMETERS: "-A hpc-prf-ekiapp -p normal -t 0:05:00"
+    SCHEDULER_PARAMETERS: "-A $PROJECT_ACCOUNT -p normal -t 1:00:00"
+    FINN_SINGULARITY: "$PATH_SINGULARITY_IMG/xilinx/finn_dev.sif"
   script:
-    - export FINN_SINGULARITY=$PC2DATA/hpc-prf-ekiapp/FINN_IMAGES/xilinx/finn_dev.sif
+    - module load system singularity
     - ./run-docker.sh quicktest
