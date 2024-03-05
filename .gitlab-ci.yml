@@ -1,8 +1,33 @@
-Quicktest Singularity Image:
-  stage: test
+variables:
+  TEST_SUITE:
+    description: "Select test suite to run"
+    value: "quicktest"
+    options:
+      - "quicktest"
+      - "main"
+      - "rtlsim"
+      - "end2end"
+      - "full"
+  CPU_CORES:
+    description: "Select number of CPU cores and test workers"
+    value: "8"
+  SLURM_TIMEOUT:
+    value: "0-24" # [days-hours]
+
+workflow:
+  rules:
+    - if: $TEST_SUITE == "quicktest"
+      variables:
+        TEST_SUITE: "" # Override with empty string to trigger default = quicktest in quicktest.py
+        SLURM_TIMEOUT: "0-1" # Reduce timeout to 1 hour
+    - when: always
+
+FINN Test Suite:
+  stage: Test
   variables:
-    SCHEDULER_PARAMETERS: "-A $PROJECT_ACCOUNT -p normal -t 1:00:00 --nodes 1 --ntasks 1 --cpus-per-task 8 --mem 64G"
+    SCHEDULER_PARAMETERS: "-A $PROJECT_ACCOUNT -p normal -t $SLURM_TIMEOUT --nodes 1 --ntasks 1 --cpus-per-task $CPU_CORES --mem 128G"
+    PYTEST_PARALLEL: "$CPU_CORES"
     FINN_SINGULARITY: "$PATH_SINGULARITY_IMG/xilinx/finn_dev.sif"
   script:
     - module load system singularity
-    - ./run-docker.sh quicktest
+    - ./run-docker.sh quicktest $TEST_SUITE
