@@ -28,6 +28,9 @@ FINN Test Suite:
     SCHEDULER_PARAMETERS: "-A $PROJECT_ACCOUNT -p normal -t $SLURM_TIMEOUT --nodes 1 --ntasks 1 --cpus-per-task $CPU_CORES --mem 128G"
     PYTEST_PARALLEL: "$CPU_CORES"
     FINN_SINGULARITY: "$PATH_SINGULARITY_IMG/xilinx/finn_dev.sif"
-  script:
+  before_script:
+    - cp -dfR .. $PATH_WORKDIR # Copy to working directory (e.g. RAMdisk)
+    - cd $PATH_WORKDIR/finn
     - module load system singularity
+  script:
     - ./run-docker.sh quicktest.sh $TEST_SUITE
