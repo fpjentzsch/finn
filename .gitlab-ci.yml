@@ -30,4 +30,4 @@ FINN Test Suite:
     FINN_SINGULARITY: "$PATH_SINGULARITY_IMG/xilinx/finn_dev.sif"
   script:
     - module load system singularity
-    - ./run-docker.sh quicktest $TEST_SUITE
+    - ./run-docker.sh quicktest.sh $TEST_SUITE
