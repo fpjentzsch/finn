@@ -27,7 +27,7 @@ Singularity Image Build:
   tags:
     - image_build
   rules:
-    changes:
+    - changes:
       - requirements.txt
       - docker/Dockerfile.finn
       - docker/finn_entrypoint.sh
