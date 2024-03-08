@@ -34,7 +34,7 @@ Singularity Image Build:
       - docker/quicktest.sh
   variables:
   before_script:
-    - FINN_SHA_SHORT=$(git -C finn rev-parse --short HEAD)
+    - FINN_SHA_SHORT=$(git rev-parse --short HEAD)
   script:
     - docker build --no-cache -f docker/Dockerfile.finn --tag=finn_docker_export .
     - apptainer build finn_singularity_image.sif docker-daemon://finn_docker_export:latest
