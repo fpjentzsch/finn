@@ -23,6 +23,4 @@ elif [ $1 = "full" ]; then
   $0 end2end;
 else
   echo "Unrecognized argument to quicktest.sh"
-  echo $1
-  echo "done"
 fi
