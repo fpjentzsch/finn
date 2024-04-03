@@ -14,7 +14,7 @@
         "nf": [-1],
         "m": [1],
 
-        "mem_mode": ["const"],
+        "mem_mode": ["internal_embedded"],
         "ram_style": ["distributed"],
         "ram_style_thr": ["distributed"],
 
