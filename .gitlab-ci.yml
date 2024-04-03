@@ -18,7 +18,7 @@ workflow:
   rules:
     - if: $TEST_SUITE == "quicktest"
       variables:
-        TEST_SUITE: "" # Override with empty string to trigger default = quicktest in quicktest.py
+        TEST_SUITE: '' # Override with empty string to trigger default = quicktest in quicktest.py
         SLURM_TIMEOUT: "0-1" # Reduce timeout to 1 hour
     - when: always
 
