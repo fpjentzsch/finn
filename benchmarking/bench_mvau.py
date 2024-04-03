@@ -857,7 +857,7 @@ def make_single_mvau_model(
         "MVAU_hls",
         node_inp_list,
         ["outp"],
-        domain="finn.custom_op.fpgadataflow",
+        domain="finn.custom_op.fpgadataflow.hls",
         backend="fpgadataflow",
         MW=mw,
         MH=mh,
