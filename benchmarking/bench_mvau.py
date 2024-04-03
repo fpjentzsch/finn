@@ -1085,7 +1085,7 @@ def bench_mvau(params, task_id, run_id, results_dir):
         W, numInputVectors, pe, simd, m, wdt, idt, odt, T, tdt, mem_mode, ram_style, ram_style_thr
     )
     model = model.transform(GiveUniqueNodeNames())
-    node = model.get_nodes_by_op_type("MatrixVectorActivation")[0]
+    node = model.get_nodes_by_op_type("MVAU_hls")[0]
     inst = getCustomOp(node)
 
     # Save model
@@ -1131,7 +1131,7 @@ def bench_mvau(params, task_id, run_id, results_dir):
         # Run
         oxe.execute_onnx(model, input_dict)["outp"]  # do not check output for correctness
         # Log result
-        node = model.get_nodes_by_op_type("MatrixVectorActivation")[0]
+        node = model.get_nodes_by_op_type("MVAU_hls")[0]
         inst = getCustomOp(node)
         rtlsim_cycles = inst.get_nodeattr("cycles_rtlsim")
         output_dict["rtlsim_cycles"] = rtlsim_cycles
