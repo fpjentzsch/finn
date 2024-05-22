@@ -23,6 +23,9 @@ workflow:
     - when: always
 
 Singularity Image Build:
+  id_tokens:
+    CI_JOB_JWT:
+      aud: https://git.uni-paderborn.de
   stage: build
   tags:
     - image_build
@@ -45,6 +48,9 @@ Singularity Image Build:
     - echo 'y' | docker builder prune
     - echo 'y' | apptainer cache clean
 FINN Test Suite:
+  id_tokens:
+    CI_JOB_JWT:
+      aud: https://git.uni-paderborn.de
   stage: test
   variables:
     SCHEDULER_PARAMETERS: "-A $PROJECT_ACCOUNT -p normal -t $SLURM_TIMEOUT --nodes 1 --ntasks 1 --cpus-per-task $CPU_CORES --mem 128G"
