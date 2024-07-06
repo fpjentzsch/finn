@@ -41,7 +41,8 @@ Sync main/dev:
     # Only run on a schedule
     - if: $CI_PIPELINE_SOURCE == "schedule"
   script:
-    - mkdir ../github_clone && cd ../github_clone
+    - mkdir -p ../github_clone && cd ../github_clone
+    - rm -rf finn # Ensure we do a fresh clone (TODO: better way to handle this on job level?)
     - git clone git@github.com:fpjentzsch/finn.git && cd finn
     - git remote add upstream https://github.com/Xilinx/finn.git
     - git checkout main
@@ -49,7 +50,7 @@ Sync main/dev:
     - git checkout dev
     - git pull upstream dev
     - git checkout feature/n2_ci
-    - git pull --rebase upstream dev
+    - git pull upstream dev
     - git push origin main dev feature/n2_ci
 
 Singularity Image Build:
