@@ -1,3 +1,8 @@
+stages:
+  - update
+  - build
+  - test
+
 variables:
   TEST_SUITE:
     description: "Select test suite to run"
@@ -16,11 +21,36 @@ variables:
 
 workflow:
   rules:
+    # Special handling for TEST_SUITE value "quicktest"
     - if: $TEST_SUITE == "quicktest"
       variables:
         TEST_SUITE: '' # Override with empty string to trigger default = quicktest in quicktest.py
         SLURM_TIMEOUT: "0-1" # Reduce timeout to 1 hour
+    # Run pipeline for all default sources
     - when: always
+
+Sync main/dev:
+  id_tokens:
+    CI_JOB_JWT:
+      aud: https://git.uni-paderborn.de
+  stage: update
+  tags:
+    # Run where full Docker + Singularity is available
+    - image_build
+  rules:
+    # Only run on a schedule
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  script:
+    - mkdir ../github_clone && cd ../github_clone
+    - git clone https://github.com/fpjentzsch/finn.git && cd finn
+    - git remote add upstream https://github.com/Xilinx/finn.git
+    - git checkout main
+    - git pull upstream/main
+    - git checkout dev
+    - git pull upstream/dev
+    - git checkout feature/n2_ci
+    - git pull --rebase upstream/dev
+    - git push origin main dev feature/n2_ci
 
 Singularity Image Build:
   id_tokens:
@@ -28,14 +58,18 @@ Singularity Image Build:
       aud: https://git.uni-paderborn.de
   stage: build
   tags:
+    # Run where full Docker + Singularity is available
     - image_build
   rules:
+    # Do not run on a schedule
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    # Only run if relevant files changed
     - changes:
       - requirements.txt
       - docker/Dockerfile.finn
       - docker/finn_entrypoint.sh
       - docker/quicktest.sh
-  variables:
   before_script:
     - FINN_SHA_SHORT=$(git rev-parse --short HEAD)
   script:
@@ -47,11 +81,16 @@ Singularity Image Build:
     - echo 'y' | docker image prune
     - echo 'y' | docker builder prune
     - echo 'y' | apptainer cache clean
+
 FINN Test Suite:
   id_tokens:
     CI_JOB_JWT:
       aud: https://git.uni-paderborn.de
   stage: test
+  rules:
+    # Do not run on a schedule
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
   variables:
     SCHEDULER_PARAMETERS: "-A $PROJECT_ACCOUNT -p normal -t $SLURM_TIMEOUT --nodes 1 --ntasks 1 --cpus-per-task $CPU_CORES --mem 128G"
     PYTEST_PARALLEL: "$CPU_CORES"
