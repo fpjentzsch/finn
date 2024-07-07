@@ -1,3 +1,9 @@
+stages:
+  - update
+  - build
+  - test
+  - bench
+
 variables:
   CPU_CORES:
     description: "Select number of CPU cores and test workers"
@@ -9,7 +15,7 @@ FINN Benchmark Suite:
   id_tokens:
     CI_JOB_JWT:
       aud: https://git.uni-paderborn.de
-  stage: test
+  stage: bench
   variables:
     SCHEDULER_PARAMETERS: "-A $PROJECT_ACCOUNT -p normal -t $SLURM_TIMEOUT --nodes 1 --ntasks 1 --cpus-per-task $CPU_CORES --mem 128G"
     PYTEST_PARALLEL: "$CPU_CORES"
@@ -21,5 +27,36 @@ FINN Benchmark Suite:
   script:
     - ./run-docker.sh python benchmarking/bench.py
 
+TEST 2:
+  id_tokens:
+    CI_JOB_JWT:
+      aud: https://git.uni-paderborn.de
+  stage: bench
+  variables:
+    SCHEDULER_PARAMETERS: "-A $PROJECT_ACCOUNT -p normal -t $SLURM_TIMEOUT --nodes 1 --ntasks 1 --cpus-per-task $CPU_CORES --mem 128G"
+    PYTEST_PARALLEL: "$CPU_CORES"
+    FINN_SINGULARITY: "$PATH_SINGULARITY_IMG/xilinx/finn_dev.sif"
+  before_script:
+    - cp -dfR .. $PATH_WORKDIR # Copy to working directory (e.g. RAMdisk)
+    - cd $PATH_WORKDIR/finn
+    - module load system singularity
+  script:
+    - ./run-docker.sh python benchmarking/bench.py
+
+TEST 3:
+  id_tokens:
+    CI_JOB_JWT:
+      aud: https://git.uni-paderborn.de
+  stage: bench
+  variables:
+    SCHEDULER_PARAMETERS: "-A $PROJECT_ACCOUNT -p normal -t $SLURM_TIMEOUT --nodes 1 --ntasks 1 --cpus-per-task $CPU_CORES --mem 128G"
+    PYTEST_PARALLEL: "$CPU_CORES"
+    FINN_SINGULARITY: "$PATH_SINGULARITY_IMG/xilinx/finn_dev.sif"
+  before_script:
+    - cp -dfR .. $PATH_WORKDIR # Copy to working directory (e.g. RAMdisk)
+    - cd $PATH_WORKDIR/finn
+    - module load system singularity
+  script:
+    - ./run-docker.sh python benchmarking/bench.py
 #TODO: more control via (optional) variables
 #TODO: consolidate logs and store as artifact
