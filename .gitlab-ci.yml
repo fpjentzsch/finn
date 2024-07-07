@@ -8,7 +8,11 @@ variables:
   CPU_CORES:
     description: "Select number of CPU cores and test workers"
     value: "8"
+  PARALLEL_JOBS:
+    description: "Number of parallel Slurm array jobs per CI job"
+    value: "1"
   SLURM_TIMEOUT:
+    description: "Timeout"
     value: "0-24" # [days-hours]
 
 FINN Benchmark Suite:
@@ -17,7 +21,7 @@ FINN Benchmark Suite:
       aud: https://git.uni-paderborn.de
   stage: bench
   variables:
-    SCHEDULER_PARAMETERS: "-A $PROJECT_ACCOUNT -p normal -t $SLURM_TIMEOUT --nodes 1 --ntasks 1 --cpus-per-task $CPU_CORES --mem 128G"
+    SCHEDULER_PARAMETERS: "-A $PROJECT_ACCOUNT -p normal -t $SLURM_TIMEOUT --nodes 1 --ntasks 1 --cpus-per-task $CPU_CORES --mem 128G --array 0-$( expr $PARALLEL_JOBS - 1 )"
     PYTEST_PARALLEL: "$CPU_CORES"
     FINN_SINGULARITY: "$PATH_SINGULARITY_IMG/xilinx/finn_dev.sif"
   before_script:
@@ -27,36 +31,6 @@ FINN Benchmark Suite:
   script:
     - ./run-docker.sh python benchmarking/bench.py
 
-TEST 2:
-  id_tokens:
-    CI_JOB_JWT:
-      aud: https://git.uni-paderborn.de
-  stage: bench
-  variables:
-    SCHEDULER_PARAMETERS: "-A $PROJECT_ACCOUNT -p normal -t $SLURM_TIMEOUT --nodes 1 --ntasks 1 --cpus-per-task $CPU_CORES --mem 128G"
-    PYTEST_PARALLEL: "$CPU_CORES"
-    FINN_SINGULARITY: "$PATH_SINGULARITY_IMG/xilinx/finn_dev.sif"
-  before_script:
-    - cp -dfR .. $PATH_WORKDIR # Copy to working directory (e.g. RAMdisk)
-    - cd $PATH_WORKDIR/finn
-    - module load system singularity
-  script:
-    - ./run-docker.sh python benchmarking/bench.py
-
-TEST 3:
-  id_tokens:
-    CI_JOB_JWT:
-      aud: https://git.uni-paderborn.de
-  stage: bench
-  variables:
-    SCHEDULER_PARAMETERS: "-A $PROJECT_ACCOUNT -p normal -t $SLURM_TIMEOUT --nodes 1 --ntasks 1 --cpus-per-task $CPU_CORES --mem 128G"
-    PYTEST_PARALLEL: "$CPU_CORES"
-    FINN_SINGULARITY: "$PATH_SINGULARITY_IMG/xilinx/finn_dev.sif"
-  before_script:
-    - cp -dfR .. $PATH_WORKDIR # Copy to working directory (e.g. RAMdisk)
-    - cd $PATH_WORKDIR/finn
-    - module load system singularity
-  script:
-    - ./run-docker.sh python benchmarking/bench.py
 #TODO: more control via (optional) variables
 #TODO: consolidate logs and store as artifact
+#TODO: (optionally) save ALL build artifacts/logs/temporary files to artifacts or PFS for debugging (maybe via Jacamar feature of setting individual persistent workdirs?)

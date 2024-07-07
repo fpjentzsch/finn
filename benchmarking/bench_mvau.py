@@ -86,6 +86,7 @@ read_saif $SAIF_FILE_PATH$
 report_power -file $REPORT_PATH$/$REPORT_NAME$.xml -format xml
 """
 
+# TODO: configurable clock frequency
 template_switching_simulation_tb = """
 `timescale 1 ns/10 ps
 
@@ -913,6 +914,9 @@ def prepare_inputs(input_tensor, idt, wdt):
 
 
 def bench_mvau(params, task_id, run_id, results_dir):
+    part = "xczu28dr-ffvg1517-2-e"  # TODO: make configurable, + Alveo support?
+    clock_period_ns = 5
+
     # Read params
     idt = params["idt"]
     wdt = params["wdt"]
@@ -1095,7 +1099,7 @@ def bench_mvau(params, task_id, run_id, results_dir):
 
     # Gather FINN estimates
     print("Gathering FINN estimates")
-    finn_resources_model = model.analysis(res_estimation)
+    finn_resources_model = model.analysis(res_estimation(fpgapart=part))
     finn_resources = finn_resources_model[node.name]
     finn_cycles_model = model.analysis(exp_cycles_per_layer)
     finn_cycles = finn_cycles_model[node.name]
@@ -1108,7 +1112,7 @@ def bench_mvau(params, task_id, run_id, results_dir):
     if do_hls:
         start_time = time.time()
         print("Performing Vitis HLS synthesis")
-        model = model.transform(PrepareIP("xczu28dr-ffvg1517-2-e", 5))
+        model = model.transform(PrepareIP(part, clock_period_ns))
         model = model.transform(HLSSynthIP())
 
         hls_resources_model = model.analysis(hls_synth_res_estimation)
@@ -1142,8 +1146,8 @@ def bench_mvau(params, task_id, run_id, results_dir):
         start_time = time.time()
         print("Performing Vivado (stitched-ip, out-of-context) synthesis")
         model = model.transform(ReplaceVerilogRelPaths())
-        model = model.transform(CreateStitchedIP("xczu28dr-ffvg1517-2-e", 5))
-        model = model.transform(SynthOutOfContext(part="xczu28dr-ffvg1517-2-e", clk_period_ns=5))
+        model = model.transform(CreateStitchedIP(part, clock_period_ns))
+        model = model.transform(SynthOutOfContext(part=part, clk_period_ns=clock_period_ns))
         ooc_synth_results = eval(model.get_metadata_prop("res_total_ooc_synth"))
 
         # Naive power reports
@@ -1174,7 +1178,6 @@ def bench_mvau(params, task_id, run_id, results_dir):
     if do_sim_power:
         start_time = time.time()
         print("Performing Vivado simulation for power report")
-        clock_period_ns = 5
         if do_rtlsim:
             sim_duration_ns = output_dict["rtlsim_cycles"] * 3 * clock_period_ns
         else:
@@ -1207,7 +1210,7 @@ def bench_mvau(params, task_id, run_id, results_dir):
         print("Performing Vivado synthesis with test harness integration for power measurement")
 
         model = model_hlssynth.transform(ReplaceVerilogRelPaths())
-        model = model.transform(CreateStitchedIP("xczu28dr-ffvg1517-2-e", 5))
+        model = model.transform(CreateStitchedIP(part, clock_period_ns))
         model = model.transform(
             MakeZYNQHarnessProject(
                 platform="RFSoC2x2",
