@@ -19,9 +19,9 @@
         "ram_style_thr": ["distributed"],
 
         "do_hls": [true],
-        "do_rtlsim": [true],
+        "do_rtlsim": [false],
         "do_synthesis": [true],
-        "do_sim_power": [true],
+        "do_sim_power": [false],
         "do_synth_power": [true],
 
         "dut_duplication": [1]
