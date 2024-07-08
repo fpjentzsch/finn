@@ -1099,7 +1099,7 @@ def bench_mvau(params, task_id, run_id, results_dir):
 
     # Gather FINN estimates
     print("Gathering FINN estimates")
-    finn_resources_model = model.analysis(res_estimation(fpgapart=part))
+    finn_resources_model = res_estimation(model, fpgapart=part)
     finn_resources = finn_resources_model[node.name]
     finn_cycles_model = model.analysis(exp_cycles_per_layer)
     finn_cycles = finn_cycles_model[node.name]

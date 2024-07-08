@@ -30,6 +30,11 @@ FINN Benchmark Suite:
     - module load system singularity
   script:
     - ./run-docker.sh python benchmarking/bench.py
+  artifacts:
+    name: "logs"
+    when: always
+    paths:
+      - bench_results/
 
 #TODO: more control via (optional) variables
 #TODO: consolidate logs and store as artifact
