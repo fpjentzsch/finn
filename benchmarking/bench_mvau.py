@@ -303,7 +303,7 @@ class MakeZYNQHarnessProject(Transformation):
 
         ip_dirs = ["list"]
         ip_dirs += collect_ip_dirs(kernel_model, ipstitch_path)
-        ip_dirs.append("$::env(FINN_ROOT)/../power_measurement/harness_sink/ip")
+        ip_dirs.append("$::env(FINN_ROOT)/benchmarking/harness/sink/ip")
         ip_dirs_str = "[%s]" % (" ".join(ip_dirs))
         config.append(
             "set_property ip_repo_paths "
@@ -312,7 +312,7 @@ class MakeZYNQHarnessProject(Transformation):
         )
         config.append("update_ip_catalog -rebuild -scan_changes")
         config.append(
-            "import_files -fileset sources_1 -norecurse $::env(FINN_ROOT)/../power_measurement/vector_xor.v"
+            "import_files -fileset sources_1 -norecurse $::env(FINN_ROOT)/benchmarking/harness/vector_xor.v"
         )
 
         # get metadata property clk_ns to calculate clock frequency

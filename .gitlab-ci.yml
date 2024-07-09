@@ -3,6 +3,7 @@ stages:
   - build
   - test
   - bench
+  - collect
 
 variables:
   CPU_CORES:
@@ -10,7 +11,7 @@ variables:
     value: "8"
   PARALLEL_JOBS:
     description: "Number of parallel Slurm array jobs per CI job"
-    value: "1"
+    value: "4"
   SLURM_TIMEOUT:
     description: "Timeout"
     value: "0-24" # [days-hours]
@@ -31,11 +32,27 @@ FINN Benchmark Suite:
   script:
     - ./run-docker.sh python benchmarking/bench.py
   artifacts:
-    name: "logs"
+    name: "bench_results_raw"
     when: always
     paths:
       - bench_results/
 
+Collect Results:
+  id_tokens:
+    CI_JOB_JWT:
+      aud: https://git.uni-paderborn.de
+  stage: collect
+  tags:
+    - image_build
+  script:
+    - python benchmarking/consolidate_logs.py bench_results/results bench_results/bench_results.json
+  artifacts:
+    name: "bench_results"
+    when: always
+    paths:
+      - bench_results/bench_results.json
+
 #TODO: more control via (optional) variables
 #TODO: consolidate logs and store as artifact
+#TODO: ensure a freshly initialized workdir on job/runner level (e.g. created directories seem to stay there)
 #TODO: (optionally) save ALL build artifacts/logs/temporary files to artifacts or PFS for debugging (maybe via Jacamar feature of setting individual persistent workdirs?)
