@@ -31,7 +31,7 @@ def main():
     experiment_dir = os.environ.get("CI_PROJECT_DIR")
 
     results_dir = os.path.join(experiment_dir, "bench_results")
-    os.makedirs(results_dir, exist_ok=True)
+    os.makedirs(os.path.join(results_dir, "results"), exist_ok=True)
     log_path = os.path.join(results_dir, "results", "task_%d.json" % (task_id))
     print("Collecting results in path: %s" % results_dir)
 
