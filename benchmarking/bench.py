@@ -35,6 +35,12 @@ def main():
     log_path = os.path.join(results_dir, "results", "task_%d.json" % (task_id))
     print("Collecting results in path: %s" % results_dir)
 
+    # save dir for saving bitstreams (and optionally full build artifacts for debugging (TODO))
+    # TODO: make this more configurable or switch to job/artifact based power measurement
+    save_dir = os.path.join("/scratch/hpc-prf-radioml/felix/jobs/", 
+                            "CI_" + os.environ.get("CI_PIPELINE_IID") + "_" + os.environ.get("CI_PIPELINE_NAME"), 
+                            "/bench_results/bitstreams")
+
     # TODO: support multiple, populate from available configs (+ optional CI variables?)
     benchmark_select = "MVAU_hls"  # sys.argv[1]
     config_select = "MVAU_hls.json"  # sys.argv[2]
@@ -104,7 +110,7 @@ def main():
 
         start_time = time.time()
         try:
-            output_dict = bench(params, task_id, run_id, results_dir)
+            output_dict = bench(params, task_id, run_id, results_dir, save_dir)
             if output_dict is None:
                 output_dict = {}
                 log_dict["status"] = "skipped"

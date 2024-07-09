@@ -262,10 +262,11 @@ close_project
 class MakeZYNQHarnessProject(Transformation):
     """Based on MakeZYNQProject transformation, but integrates IP into test harness instead of DMA shell."""
 
-    def __init__(self, platform, results_dir, run_id, dut_duplication=1):
+    def __init__(self, platform, results_dir, save_dir, run_id, dut_duplication=1):
         super().__init__()
         self.platform = platform
         self.results_dir = results_dir
+        self.save_dir = save_dir
         self.run_id = run_id
         self.dut_duplication = dut_duplication
 
@@ -660,6 +661,12 @@ class MakeZYNQHarnessProject(Transformation):
         deploy_synth_report_filename = results_dir_bitstreams + "/run_%d.xml" % self.run_id
         shcopy(synth_report_filename, deploy_synth_report_filename)
 
+        # copy additionally to a separate PFS location for measurement automation to pick it up
+        # TODO: make this more configurable or switch to job/artifact based power measurement 
+        shcopy(deploy_bitfile_name, self.save_dir)
+        shcopy(deploy_hwh_name, self.save_dir)
+        shcopy(deploy_synth_report_filename, self.save_dir)
+
         # model.set_metadata_prop("bitfile", deploy_bitfile_name)
         # model.set_metadata_prop("hw_handoff", deploy_hwh_name)
         # model.set_metadata_prop("vivado_synth_rpt", synth_report_filename)
@@ -913,7 +920,7 @@ def prepare_inputs(input_tensor, idt, wdt):
         return {"inp": input_tensor}
 
 
-def bench_mvau(params, task_id, run_id, results_dir):
+def bench_mvau(params, task_id, run_id, results_dir, save_dir):
     part = "xczu28dr-ffvg1517-2-e"  # TODO: make configurable, + Alveo support?
     clock_period_ns = 5
 
@@ -1215,6 +1222,7 @@ def bench_mvau(params, task_id, run_id, results_dir):
             MakeZYNQHarnessProject(
                 platform="RFSoC2x2",
                 results_dir=results_dir,
+                save_dir = save_dir,
                 run_id=run_id,
                 dut_duplication=dut_duplication,
             )

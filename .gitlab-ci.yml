@@ -6,6 +6,9 @@ stages:
   - collect
 
 variables:
+  PIPELINE_NAME:
+    description: "Optional name to better identify this pipeline"
+    value: ""
   CPU_CORES:
     description: "Select number of CPU cores and test workers"
     value: "8"
@@ -15,6 +18,9 @@ variables:
   SLURM_TIMEOUT:
     description: "Timeout"
     value: "0-24" # [days-hours]
+
+workflow:
+  name: '$PIPELINE_NAME'
 
 FINN Benchmark Suite:
   id_tokens:
@@ -53,6 +59,6 @@ Collect Results:
       - bench_results/bench_results.json
 
 #TODO: more control via (optional) variables
-#TODO: consolidate logs and store as artifact
+#TODO: move power measurement from polling-based script to its own job/runner
 #TODO: ensure a freshly initialized workdir on job/runner level (e.g. created directories seem to stay there)
 #TODO: (optionally) save ALL build artifacts/logs/temporary files to artifacts or PFS for debugging (maybe via Jacamar feature of setting individual persistent workdirs?)
