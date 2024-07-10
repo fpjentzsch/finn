@@ -40,6 +40,7 @@ def main():
     save_dir = os.path.join("/scratch/hpc-prf-radioml/felix/jobs/", 
                             "CI_" + os.environ.get("CI_PIPELINE_IID") + "_" + os.environ.get("CI_PIPELINE_NAME"), 
                             "/bench_results/bitstreams")
+    os.makedirs(save_dir, exist_ok=True)
 
     # TODO: support multiple, populate from available configs (+ optional CI variables?)
     benchmark_select = "MVAU_hls"  # sys.argv[1]
