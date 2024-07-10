@@ -38,12 +38,12 @@ def merge_logs(log_a, log_b, log_out):
         json.dump(out, f, indent=2)
 
 def wait_for_power_measurements():
-    # TODO: make configurable
-    bitstreams_path = os.path.join("/scratch/hpc-prf-radioml/felix/jobs/", 
+    # TODO: make configurable, relative to some env variable due to different mountint points
+    bitstreams_path = os.path.join("/mnt/pfs/hpc-prf-radioml/felix/jobs/", 
                             "CI_" + os.environ.get("CI_PIPELINE_IID") + "_" + os.environ.get("CI_PIPELINE_NAME"), 
                             "bench_results/bitstreams")
     
-    power_log_path = os.path.join("/scratch/hpc-prf-radioml/felix/jobs/", 
+    power_log_path = os.path.join("/mnt/pfs/hpc-prf-radioml/felix/jobs/", 
                             "CI_" + os.environ.get("CI_PIPELINE_IID") + "_" + os.environ.get("CI_PIPELINE_NAME"), 
                             "bench_results/power_measure.json")
 
@@ -68,7 +68,7 @@ if __name__ == "__main__":
     wait_for_power_measurements()
 
     print("Merging power measurement logs with remaining logs")
-    power_log_path = os.path.join("/scratch/hpc-prf-radioml/felix/jobs/", 
+    power_log_path = os.path.join("/mnt/pfs/hpc-prf-radioml/felix/jobs/", 
                             "CI_" + os.environ.get("CI_PIPELINE_IID") + "_" + os.environ.get("CI_PIPELINE_NAME"), 
                             "bench_results/power_measure.json")
     merge_logs(sys.argv[2], power_log_path, sys.argv[2])
