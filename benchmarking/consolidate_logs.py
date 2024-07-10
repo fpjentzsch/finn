@@ -41,11 +41,11 @@ def wait_for_power_measurements():
     # TODO: make configurable
     bitstreams_path = os.path.join("/scratch/hpc-prf-radioml/felix/jobs/", 
                             "CI_" + os.environ.get("CI_PIPELINE_IID") + "_" + os.environ.get("CI_PIPELINE_NAME"), 
-                            "/bench_results/bitstreams")
+                            "bench_results/bitstreams")
     
     power_log_path = os.path.join("/scratch/hpc-prf-radioml/felix/jobs/", 
                             "CI_" + os.environ.get("CI_PIPELINE_IID") + "_" + os.environ.get("CI_PIPELINE_NAME"), 
-                            "/bench_results/power_measure.json")
+                            "bench_results/power_measure.json")
 
     # count bitstreams to measure (can't rely on total number of runs since some of them could've failed)
     files = os.listdir(bitstreams_path)
@@ -70,6 +70,6 @@ if __name__ == "__main__":
     print("Merging power measurement logs with remaining logs")
     power_log_path = os.path.join("/scratch/hpc-prf-radioml/felix/jobs/", 
                             "CI_" + os.environ.get("CI_PIPELINE_IID") + "_" + os.environ.get("CI_PIPELINE_NAME"), 
-                            "/bench_results/power_measure.json")
+                            "bench_results/power_measure.json")
     merge_logs(sys.argv[2], power_log_path, sys.argv[2])
     print("Done")
