@@ -39,7 +39,7 @@ def main():
     # TODO: make this more configurable or switch to job/artifact based power measurement
     save_dir = os.path.join("/scratch/hpc-prf-radioml/felix/jobs/",
                             "CI_" + os.environ.get("CI_PIPELINE_IID") + "_" + os.environ.get("CI_PIPELINE_NAME"),
-                            "/bench_results/bitstreams")
+                            "bench_results", "bitstreams")
     print("Saving additional artifacts in path: %s" % save_dir)
     os.makedirs(save_dir, exist_ok=True)
 
