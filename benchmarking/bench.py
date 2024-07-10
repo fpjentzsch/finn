@@ -31,15 +31,16 @@ def main():
     experiment_dir = os.environ.get("CI_PROJECT_DIR")
 
     results_dir = os.path.join(experiment_dir, "bench_results")
+    print("Collecting results in path: %s" % results_dir)
     os.makedirs(os.path.join(results_dir, "results"), exist_ok=True)
     log_path = os.path.join(results_dir, "results", "task_%d.json" % (task_id))
-    print("Collecting results in path: %s" % results_dir)
-
+    
     # save dir for saving bitstreams (and optionally full build artifacts for debugging (TODO))
     # TODO: make this more configurable or switch to job/artifact based power measurement
-    save_dir = os.path.join("/scratch/hpc-prf-radioml/felix/jobs/", 
-                            "CI_" + os.environ.get("CI_PIPELINE_IID") + "_" + os.environ.get("CI_PIPELINE_NAME"), 
+    save_dir = os.path.join("/scratch/hpc-prf-radioml/felix/jobs/",
+                            "CI_" + os.environ.get("CI_PIPELINE_IID") + "_" + os.environ.get("CI_PIPELINE_NAME"),
                             "/bench_results/bitstreams")
+    print("Saving additional artifacts in path: %s" % save_dir)
     os.makedirs(save_dir, exist_ok=True)
 
     # TODO: support multiple, populate from available configs (+ optional CI variables?)
