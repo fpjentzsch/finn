@@ -49,7 +49,7 @@ def wait_for_power_measurements():
 
     # count bitstreams to measure (can't rely on total number of runs since some of them could've failed)
     files = os.listdir(bitstreams_path)
-    bitstream_count = len(filter(lambda x : ".bit" in x, files))
+    bitstream_count = len(list(filter(lambda x : ".bit" in x, files)))
 
     log = []
     print("Checking if all bitstreams of pipeline have been measured..")
