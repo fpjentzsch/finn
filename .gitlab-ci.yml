@@ -76,8 +76,8 @@ Singularity Image Build:
   script:
     - docker build --no-cache -f docker/Dockerfile.finn --tag=finn_docker_export .
     - apptainer build finn_singularity_image.sif docker-daemon://finn_docker_export:latest
-    - cp finn_singularity_image.sif $PATH_SINGULARITY_IMG_BUILD/xilinx/finn_dev.sif
-    - cp finn_singularity_image.sif $PATH_SINGULARITY_IMG_BUILD/xilinx/finn_$FINN_SHA_SHORT.sif
+    - rsync -vh finn_singularity_image.sif $PATH_SINGULARITY_IMG_BUILD/xilinx/finn_dev.sif
+    - rsync -vh finn_singularity_image.sif $PATH_SINGULARITY_IMG_BUILD/xilinx/finn_$FINN_SHA_SHORT.sif
   after_script: # Clean caches
     - echo 'y' | docker image prune
     - echo 'y' | docker builder prune
