@@ -28,7 +28,8 @@ def merge_logs(log_a, log_b, log_out):
     for idx, run_a in enumerate(a):
         for run_b in b:
             if run_a["run_id"] == run_b["run_id"]:
-                a[idx] |= run_b
+                #a[idx] |= run_b # requires Python > 3.9
+                a[idx] = {**run_a, **run_b}
                 break
 
     # also sort by run id
