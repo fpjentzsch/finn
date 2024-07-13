@@ -262,13 +262,14 @@ close_project
 class MakeZYNQHarnessProject(Transformation):
     """Based on MakeZYNQProject transformation, but integrates IP into test harness instead of DMA shell."""
 
-    def __init__(self, platform, results_dir, save_dir, run_id, dut_duplication=1):
+    def __init__(self, platform, results_dir, save_dir, run_id, dut_duplication=1, clock_period_ns=10):
         super().__init__()
         self.platform = platform
         self.results_dir = results_dir
         self.save_dir = save_dir
         self.run_id = run_id
         self.dut_duplication = dut_duplication
+        self.clock_period_ns = clock_period_ns
 
     def apply(self, model):
         # create a config file and empty list of xo files
@@ -666,6 +667,11 @@ class MakeZYNQHarnessProject(Transformation):
         shcopy(deploy_bitfile_name, self.save_dir)
         shcopy(deploy_hwh_name, self.save_dir)
         shcopy(deploy_synth_report_filename, self.save_dir)
+
+        clock_period_mhz = int(1.0 / self.clock_period_ns * 1000.0)
+        measurement_settings = {"freq_mhz": clock_period_mhz}
+        with open(os.path.join(self.save_dir, "run_%d_settings.json"%self.run_id), "w") as f:
+            json.dump(measurement_settings, f, indent=2)
 
         # model.set_metadata_prop("bitfile", deploy_bitfile_name)
         # model.set_metadata_prop("hw_handoff", deploy_hwh_name)
@@ -1225,6 +1231,7 @@ def bench_mvau(params, task_id, run_id, results_dir, save_dir):
                 save_dir = save_dir,
                 run_id=run_id,
                 dut_duplication=dut_duplication,
+                clock_period_ns=clock_period_ns
             )
         )
 
