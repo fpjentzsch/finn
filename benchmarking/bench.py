@@ -738,7 +738,7 @@ class bench():
         # Save model for logging purposes
         model.save(os.path.join(self.results_dir_models, "model_%d_synth_power.onnx" % (self.run_id)))
 
-    def bench_run(self):
+    def run(self):
         do_hls = self.params["do_hls"]
         do_rtlsim = self.params["do_rtlsim"]
         do_synthesis = self.params["do_synthesis"]
