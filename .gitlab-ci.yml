@@ -51,7 +51,7 @@ Collect Results:
   tags:
     - image_build
   script:
-    - python benchmarking/consolidate_logs.py bench_results/results bench_results/bench_results.json
+    - python benchmarking/collect.py bench_results/results bench_results/bench_results.json
   artifacts:
     name: "bench_results"
     when: always
