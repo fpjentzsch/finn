@@ -59,6 +59,7 @@ Collect Results:
       - bench_results/bench_results.json
 
 #TODO: more control via (optional) variables
+#TODO: enable json config file input
 #TODO: move power measurement from polling-based script to its own job/runner
 #TODO: ensure a freshly initialized workdir on job/runner level (e.g. created directories seem to stay there)
 #TODO: (optionally) save ALL build artifacts/logs/temporary files to artifacts or PFS for debugging (maybe via Jacamar feature of setting individual persistent workdirs?)

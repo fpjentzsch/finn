@@ -4,6 +4,17 @@ import os
 import sys
 import time
 
+def merge_dicts(a: dict, b: dict):
+    for key in b:
+        if key in a:
+            if isinstance(a[key], dict) and isinstance(b[key], dict):
+                merge_dicts(a[key], b[key])
+            elif a[key] != b[key]:
+                raise Exception("ERROR: Dict merge conflict")
+        else:
+            a[key] = b[key]
+    return a
+
 def consolidate_logs(path, output_filepath):
     log = []
     i = 0
@@ -28,8 +39,9 @@ def merge_logs(log_a, log_b, log_out):
     for idx, run_a in enumerate(a):
         for run_b in b:
             if run_a["run_id"] == run_b["run_id"]:
-                #a[idx] |= run_b # requires Python > 3.9
-                a[idx] = {**run_a, **run_b}
+                #a[idx] |= run_b # requires Python >= 3.9
+                #a[idx] = {**run_a, **run_b}
+                a[idx] = merge_dicts(run_a, run_b)
                 break
 
     # also sort by run id

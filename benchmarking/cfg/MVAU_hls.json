@@ -20,7 +20,7 @@
 
         "do_hls": [true],
         "do_rtlsim": [false],
-        "do_synthesis": [true],
+        "do_synthesis": [false],
         "do_sim_power": [false],
         "do_synth_power": [true],
 
