@@ -599,6 +599,7 @@ class bench():
         # Perform Vitis HLS synthesis for HLS resource/performance reports
         start_time = time.time()
         print("Performing Vitis HLS synthesis")
+        model = self.model_initial
         model = model.transform(PrepareIP(self.part, self.clock_period_ns))
         model = model.transform(HLSSynthIP())
 
@@ -618,6 +619,7 @@ class bench():
         start_time = time.time()
         print("Performing Verilator RTL simulation (n=1)")
         # Prepare
+        model = self.model_step_hls
         model = model.transform(SetExecMode("rtlsim"))
         model = model.transform(PrepareRTLSim())
         # Generate input data
@@ -640,6 +642,7 @@ class bench():
 
         start_time = time.time()
         print("Performing Vivado (stitched-ip, out-of-context) synthesis")
+        model = self.model_step_hls
         model = model.transform(ReplaceVerilogRelPaths())
         model = model.transform(CreateStitchedIP(self.part, self.clock_period_ns))
         model = model.transform(SynthOutOfContext(part=self.part, clk_period_ns=self.clock_period_ns))
