@@ -5,6 +5,7 @@ import copy
 import json
 import time
 import traceback
+import glob
 from shutil import copy as shcopy
 import finn.core.onnx_exec as oxe
 from qonnx.custom_op.registry import getCustomOp
@@ -23,7 +24,7 @@ from finn.analysis.fpgadataflow.res_estimation import res_estimation
 from finn.transformation.fpgadataflow.make_zynq_proj import collect_ip_dirs
 from finn.util.basic import make_build_dir, pynq_native_port_width, pynq_part_map
 from dut.mvau import make_mvau_dut
-from dut.transformer import make_transformer_dut
+from dut.transformer import make_transformer_dut, build_transformer
 from templates import template_open, template_single_test, template_sim_power, template_switching_simulation_tb, zynq_harness_template
 from util import summarize_table, summarize_section, power_xml_to_dict, prepare_inputs
 from finn.transformation.fpgadataflow.replace_verilog_relpaths import (
@@ -33,6 +34,7 @@ from qonnx.util.basic import (
     gen_finn_dt_tensor,
     roundup_to_integer_multiple,
 )
+import pandas as pd
 
 class MakeZYNQHarnessProject(Transformation):
     """Based on MakeZYNQProject transformation, but integrates IP into test harness instead of DMA shell."""
@@ -560,7 +562,10 @@ class bench():
             model, dut_info = make_mvau_dut(self.params)
             self.target_node = "MVAU_hls" # display results of analysis passes only for the first occurence of this op type
         elif self.dut == "transformer":
-            model, dut_info = make_transformer_dut(self.params)
+            make_transformer_dut(self.params)
+            build_transformer(self.params)
+            model = None
+            dut_info = {}
             self.target_node = None # aggregate results of analysis passes over all nodes in the DUT
         else:
             print("ERROR: unknown DUT specified")
@@ -696,7 +701,7 @@ class bench():
             ),
             in_width=input_node_inst.get_instream_width(),
             out_width=output_node_inst.get_outstream_width(),
-            dtype_width=model.get_tensor_datatype(input_tensor.name).bitwidth(), #TODO: check if this really works
+            dtype_width=model.get_tensor_datatype(input_tensor.name).bitwidth(),
             sim_duration_ns=sim_duration_ns,
         )
 
@@ -741,16 +746,54 @@ class bench():
         # Save model for logging purposes
         model.save(os.path.join(self.results_dir_models, "model_%d_synth_power.onnx" % (self.run_id)))
 
+    def step_parse_builder_output(self):
+        # Used to parse selected reports/logs into the output json dict for DUTs that use a full FINN builder flow
+
+        # CHECK FOR VERIFICATION STEP SUCCESS
+        # Collect all verification output filenames
+        outputs = glob.glob("build/verification_output/*.npy")
+        # Extract the verification status for each verification output by matching
+        # to the SUCCESS string contained in the filename
+        status = all([
+            out.split("_")[-1].split(".")[0] == "SUCCESS" for out in outputs
+        ])
+   
+        # Construct a dictionary reporting the verification status as string
+        self.output_dict["builder_verification"] = {"verification": {True: "success", False: "fail"}[status]}
+        # TODO: mark job as failed if verification fails
+
+        # PARSE LOGS
+        report_path = "build/report/post_synth_resources.json"
+        report_filter = "(top)"
+        # Open the report file
+        with open(report_path) as file:
+            # Load the JSON formatted report
+            report = pd.read_json(file, orient="index")
+        # Filter the reported rows according to some regex filter rule
+        report = report.filter(regex=report_filter, axis="rows")
+        # Generate a summary of the total resources
+        summary = report.sum()
+
+        #TODO: parse finn estimates, hls estimates, step times, (rtlsim n=1, n=100)
+        #TODO: add vivado latency simulation for special transformer case
+        
+        self.output_dict["builder"] = summary.to_dict()
+
     def run(self):
-        do_hls = self.params["do_hls"]
-        do_rtlsim = self.params["do_rtlsim"]
-        do_synthesis = self.params["do_synthesis"]
-        do_sim_power = self.params["do_sim_power"]
-        do_synth_power = self.params["do_synth_power"]
+        do_hls = self.params["do_hls"] if "do_hls" in self.params else False
+        do_rtlsim = self.params["do_rtlsim"] if "do_rtlsim" in self.params else False
+        do_synthesis = self.params["do_synthesis"] if "do_synthesis" in self.params else False
+        do_sim_power = self.params["do_sim_power"] if "do_sim_power" in self.params else False
+        do_synth_power = self.params["do_synth_power"] if "do_synth_power" in self.params else False
 
         # Perform steps
         self.step_make_dut()
-        self.step_finn_estimate()
+        #TODO: use sub classes for single-node flows and full builder flows
+        if self.dut == "mvau":
+            self.step_finn_estimate()
+
+        if self.dut == "transformer":
+            self.step_parse_builder_output()
 
         if do_hls:
             self.step_hls()
