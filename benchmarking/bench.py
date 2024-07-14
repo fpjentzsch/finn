@@ -624,8 +624,8 @@ class bench():
         model = model.transform(PrepareRTLSim())
         # Generate input data
         input_tensor = model.graph.input[0]
-        input_shape = model.get_tensor_shape(input_tensor)
-        input_dtype = model.get_tensor_datatype(input_tensor)
+        input_shape = model.get_tensor_shape(input_tensor.name)
+        input_dtype = model.get_tensor_datatype(input_tensor.name)
         x = gen_finn_dt_tensor(input_dtype, input_shape)
         input_dict = prepare_inputs(x, input_dtype, None) # TODO: fix Bipolar conversion case
         # Run
@@ -687,8 +687,8 @@ class bench():
         model = self.model_step_synthesis
         input_tensor = model.graph.input[0]
         output_tensor = model.graph.output[0]
-        input_node_inst = getCustomOp(model.find_consumer(input_tensor))
-        output_node_inst = getCustomOp(model.find_producer(output_tensor))
+        input_node_inst = getCustomOp(model.find_consumer(input_tensor.name))
+        output_node_inst = getCustomOp(model.find_producer(output_tensor.name))
         sim_power_report(
             results_path=self.results_dir_power,
             project_path=os.path.join(
@@ -696,7 +696,7 @@ class bench():
             ),
             in_width=input_node_inst.get_instream_width(),
             out_width=output_node_inst.get_outstream_width(),
-            dtype_width=model.get_tensor_datatype(input_tensor).bitwidth(), #TODO: check if this really works
+            dtype_width=model.get_tensor_datatype(input_tensor.name).bitwidth(), #TODO: check if this really works
             sim_duration_ns=sim_duration_ns,
         )
 
