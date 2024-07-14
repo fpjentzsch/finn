@@ -25,7 +25,7 @@ import finn.builder.build_dataflow_config as build_cfg
 from finn.builder.build_dataflow_config import AutoFIFOSizingMethod
 
 # Custom build steps required to streamline and convert the attention operator
-from transformer_custom_steps import (
+from dut.transformer_custom_steps import (
     step_tidy_up_pre_attention,
     step_tidy_up_post_attention,
     step_streamline_attention,
