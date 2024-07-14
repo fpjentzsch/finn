@@ -18,6 +18,9 @@ variables:
   SLURM_TIMEOUT:
     description: "Timeout"
     value: "0-24" # [days-hours]
+  MANUAL_CFG_PATH:
+    description: "Use this config file instead of configs stored in the repo. Path must be accessible to runner"
+    value: ""
 
 workflow:
   name: '$PIPELINE_NAME'

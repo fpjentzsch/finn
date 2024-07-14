@@ -802,14 +802,16 @@ def main():
     os.makedirs(save_dir, exist_ok=True)
 
     # Gather benchmarking configs
-    # TODO: allow to instead accept a single json file as pipeline variable
-    configs_path = os.path.join(os.path.dirname(__file__), "cfg")
-    for config in os.listdir(configs_path):
-        # only evaluate first config file found
-        # TODO: allow arbitrary number of dut configs (maybe via spawning separate pipelines/jobs?)
-        config_select = config
-        break
-   
+    if os.environ.get("MANUAL_CFG_PATH") != "":
+        configs_path, config_select = os.path.split(os.environ.get("MANUAL_CFG_PATH"))
+    else:
+        configs_path = os.path.join(os.path.dirname(__file__), "cfg")
+        for config in os.listdir(configs_path):
+            # only evaluate first config file found
+            # TODO: allow arbitrary number of dut configs (maybe via spawning separate pipelines/jobs?)
+            config_select = config
+            break
+
     # Determine which DUT to run
     if config_select.startswith("mvau"):
         dut = "mvau"
