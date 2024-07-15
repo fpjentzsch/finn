@@ -24,6 +24,7 @@ from finn.analysis.fpgadataflow.res_estimation import res_estimation
 from finn.transformation.fpgadataflow.make_zynq_proj import collect_ip_dirs
 from finn.util.basic import make_build_dir, pynq_native_port_width, pynq_part_map
 from dut.mvau import make_mvau_dut
+from dut.transformer import make_transformer_dut, build_transformer
 from templates import template_open, template_single_test, template_sim_power, template_switching_simulation_tb, zynq_harness_template
 from util import summarize_table, summarize_section, power_xml_to_dict, prepare_inputs
 from finn.transformation.fpgadataflow.replace_verilog_relpaths import (
@@ -560,6 +561,12 @@ class bench():
         if self.dut == "mvau":
             model, dut_info = make_mvau_dut(self.params)
             self.target_node = "MVAU_hls" # display results of analysis passes only for the first occurence of this op type
+        elif self.dut == "transformer":
+            make_transformer_dut(self.params)
+            build_transformer(self.params)
+            model = None
+            dut_info = {}
+            self.target_node = None # aggregate results of analysis passes over all nodes in the DUT
         else:
             print("ERROR: unknown DUT specified")
 
@@ -785,6 +792,9 @@ class bench():
         if self.dut == "mvau":
             self.step_finn_estimate()
 
+        if self.dut == "transformer":
+            self.step_parse_builder_output()
+
         if do_hls:
             self.step_hls()
         if do_rtlsim:
@@ -848,6 +858,8 @@ def main():
     # Determine which DUT to run
     if config_select.startswith("mvau"):
         dut = "mvau"
+    elif config_select.startswith("transformer"):
+        dut = "transformer"
     else:
         print("ERROR: unknown DUT specified")
     print("Running benchmark for design-under-test %s" % (dut))
