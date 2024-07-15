@@ -741,8 +741,8 @@ def make_transformer_dut(params):
     # Export the model graph to QONNX
     #export_qonnx(model, (x,), "attention.onnx", **params["export"])
     export_qonnx(model, (x,), "attention.onnx", 
-                 export_opset_version = 14, 
-                 export_do_constant_folding = True)
+                 opset_version = 14, 
+                 do_constant_folding = True)
 
 template_folding_yaml = """
 # Per operator type default configurations
