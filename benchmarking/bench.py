@@ -35,6 +35,7 @@ from qonnx.util.basic import (
     roundup_to_integer_multiple,
 )
 import pandas as pd
+import onnxruntime as ort
 
 class MakeZYNQHarnessProject(Transformation):
     """Based on MakeZYNQProject transformation, but integrates IP into test harness instead of DMA shell."""
@@ -780,6 +781,15 @@ class bench():
         self.output_dict["builder"] = summary.to_dict()
 
     def run(self):
+        # Attempt to work around onnxruntime issue on Slurm-managed clusters:
+        # See https://github.com/microsoft/onnxruntime/issues/8313
+        _default_session_options = ort.capi._pybind_state.get_default_session_options()
+        def get_default_session_options_new():
+            _default_session_options.inter_op_num_threads = 1
+            _default_session_options.intra_op_num_threads = 1
+            return _default_session_options
+        ort.capi._pybind_state.get_default_session_options = get_default_session_options_new
+
         do_hls = self.params["do_hls"] if "do_hls" in self.params else False
         do_rtlsim = self.params["do_rtlsim"] if "do_rtlsim" in self.params else False
         do_synthesis = self.params["do_synthesis"] if "do_synthesis" in self.params else False
