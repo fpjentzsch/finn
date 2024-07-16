@@ -105,6 +105,7 @@ def main():
 
     # Run benchmark
     # TODO: integrate this loop (especially status logging) into the bench class
+    # TODO: log additional info as artifact or directly into info section of json (e.g. dut, versions, date)
     log = []
     for run, run_id in enumerate(selected_runs):
         print(

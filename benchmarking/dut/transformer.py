@@ -859,7 +859,7 @@ class bench_transformer(bench):
         with open("specialize_layers.json", "w") as f:
                 json.dump(specialize_layers_dict, f, indent=2)
         with open("folding.yaml", "w") as f:
-                json.dump(template_folding_yaml, f, indent=2)
+                f.write(template_folding_yaml)
 
         # Create a configuration for building the scaled dot-product attention
         # operator to a hardware accelerator
