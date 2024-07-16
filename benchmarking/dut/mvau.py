@@ -24,6 +24,7 @@ from bench_base import bench
 class bench_mvau(bench):
 
     def _make_single_mvau_model(
+        self,
         W,
         numInputVectors,
         pe,
