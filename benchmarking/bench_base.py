@@ -808,6 +808,6 @@ class bench():
         # Default step sequence for benchmarking a full FINN builder flow
         self.step_export_onnx()
 
-        self.step_build
+        self.step_build()
 
         self.step_parse_builder_output()
