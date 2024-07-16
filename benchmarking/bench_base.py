@@ -562,12 +562,18 @@ class bench():
     def save_artifact(self, name, source_path):
         target_path = os.path.join(self.artifacts_dir, name, "run_%d" % (self.run_id))
         os.makedirs(target_path, exist_ok=True)
-        copytree(source_path, target_path, dirs_exist_ok=True)
+        if os.path.isdir(source_path):
+            copytree(source_path, target_path, dirs_exist_ok=True)
+        else:
+            shcopy(source_path, target_path)
 
     def save_local_artifact(self, name, source_path):
         target_path = os.path.join(self.save_dir, name, "run_%d" % (self.run_id))
         os.makedirs(target_path, exist_ok=True)
-        copytree(source_path, target_path, dirs_exist_ok=True)
+        if os.path.isdir(source_path):
+            copytree(source_path, target_path, dirs_exist_ok=True)
+        else:
+            shcopy(source_path, target_path)
 
     def step_make_model(self):
         # may be implemented in subclass
