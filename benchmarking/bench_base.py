@@ -23,8 +23,6 @@ from finn.analysis.fpgadataflow.hls_synth_res_estimation import hls_synth_res_es
 from finn.analysis.fpgadataflow.res_estimation import res_estimation
 from finn.transformation.fpgadataflow.make_zynq_proj import collect_ip_dirs
 from finn.util.basic import make_build_dir, pynq_native_port_width, pynq_part_map
-import dut.mvau
-import dut.transformer
 from templates import template_open, template_single_test, template_sim_power, template_switching_simulation_tb, zynq_harness_template
 from util import summarize_table, summarize_section, power_xml_to_dict, prepare_inputs
 from finn.transformation.fpgadataflow.replace_verilog_relpaths import (
