@@ -749,12 +749,12 @@ class bench():
         # Save model for logging purposes
         model.save(os.path.join(self.artifacts_dir_models, "model_%d_synth_power.onnx" % (self.run_id)))
 
-    def step_parse_builder_output(self):
+    def step_parse_builder_output(self, build_dir):
         # Used to parse selected reports/logs into the output json dict for DUTs that use a full FINN builder flow
 
         # CHECK FOR VERIFICATION STEP SUCCESS
         # Collect all verification output filenames
-        outputs = glob.glob("build/verification_output/*.npy")
+        outputs = glob.glob(os.path.join(build_dir, "verification_output/*.npy"))
         # Extract the verification status for each verification output by matching
         # to the SUCCESS string contained in the filename
         status = all([
@@ -766,7 +766,7 @@ class bench():
         # TODO: mark job as failed if verification fails
 
         # PARSE LOGS
-        report_path = "build/report/post_synth_resources.json"
+        report_path = os.path.join(build_dir, "report/post_synth_resources.json")
         report_filter = "(top)"
         # Open the report file
         with open(report_path) as file:
@@ -830,4 +830,4 @@ class bench():
         self.step_build(onnx_export_path, build_dir)
         self.save_local_artifact("build_output", build_dir)
 
-        self.step_parse_builder_output()
+        self.step_parse_builder_output(build_dir)
