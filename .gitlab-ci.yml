@@ -14,12 +14,15 @@ variables:
     value: "8"
   PARALLEL_JOBS:
     description: "Number of parallel Slurm array jobs per CI job"
-    value: "4"
+    value: "2"
   SLURM_TIMEOUT:
     description: "Timeout"
-    value: "0-24" # [days-hours]
+    value: "0-12" # [days-hours]
   MANUAL_CFG_PATH:
     description: "Use this config file instead of configs stored in the repo. Path must be accessible to runner"
+    value: ""
+  SLURM_QOS:
+    description: "Optional QoS option (include --qos, e.g., --qos express)"
     value: ""
 
 workflow:
@@ -31,7 +34,7 @@ FINN Benchmark Suite:
       aud: https://git.uni-paderborn.de
   stage: bench
   variables:
-    SCHEDULER_PARAMETERS: "-A $PROJECT_ACCOUNT -p normal -t $SLURM_TIMEOUT --nodes 1 --ntasks 1 --cpus-per-task $CPU_CORES --mem 128G --array 0-$( expr $PARALLEL_JOBS - 1 )"
+    SCHEDULER_PARAMETERS: "-A $PROJECT_ACCOUNT -p normal -t $SLURM_TIMEOUT $SLURM_QOS --nodes 1 --ntasks 1 --cpus-per-task $CPU_CORES --mem 128G --array 0-$( expr $PARALLEL_JOBS - 1 )"
     PYTEST_PARALLEL: "$CPU_CORES"
     FINN_SINGULARITY: "$PATH_SINGULARITY_IMG/xilinx/finn_dev.sif"
   before_script:
