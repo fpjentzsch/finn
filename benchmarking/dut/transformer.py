@@ -24,7 +24,7 @@ import finn.builder.build_dataflow as build
 import finn.builder.build_dataflow_config as build_cfg
 from finn.builder.build_dataflow_config import AutoFIFOSizingMethod
 
-from bench import bench
+import bench
 
 # Custom build steps required to streamline and convert the attention operator
 from dut.transformer_custom_steps import (
