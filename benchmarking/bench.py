@@ -39,16 +39,15 @@ def main():
     # experiment_dir = os.environ.get("EXPERIMENT_DIR") # original experiment dir (before potential copy to ramdisk)
     experiment_dir = os.environ.get("CI_PROJECT_DIR")
 
-    results_dir = os.path.join(experiment_dir, "bench_results")
-    print("Collecting results in path: %s" % results_dir)
-    os.makedirs(os.path.join(results_dir, "results"), exist_ok=True)
-    log_path = os.path.join(results_dir, "results", "task_%d.json" % (task_id))
+    artifacts_dir = os.path.join(experiment_dir, "bench_artifacts")
+    print("Collecting results in path: %s" % artifacts_dir)
+    os.makedirs(os.path.join(artifacts_dir, "tasks_output"), exist_ok=True)
+    log_path = os.path.join(artifacts_dir, "tasks_output", "task_%d.json" % (task_id))
     
     # save dir for saving bitstreams (and optionally full build artifacts for debugging (TODO))
     # TODO: make this more configurable or switch to job/artifact based power measurement
     save_dir = os.path.join("/scratch/hpc-prf-radioml/felix/jobs/",
-                            "CI_" + os.environ.get("CI_PIPELINE_IID") + "_" + os.environ.get("CI_PIPELINE_NAME"),
-                            "bench_results", "bitstreams")
+                            "CI_" + os.environ.get("CI_PIPELINE_IID") + "_" + os.environ.get("CI_PIPELINE_NAME"))
     print("Saving additional artifacts in path: %s" % save_dir)
     os.makedirs(save_dir, exist_ok=True)
 
@@ -83,9 +82,9 @@ def main():
 
     # Save config (only first job of array) for logging purposes
     if task_id == 0:
-        with open(os.path.join(results_dir, "bench_config.json"), "w") as f:
+        with open(os.path.join(artifacts_dir, "bench_config.json"), "w") as f:
             json.dump(config, f, indent=2)
-        with open(os.path.join(results_dir, "bench_config_exp.json"), "w") as f:
+        with open(os.path.join(artifacts_dir, "bench_config_exp.json"), "w") as f:
             json.dump(config_expanded, f, indent=2)
 
     # Determine which runs this job will work on
@@ -120,9 +119,9 @@ def main():
 
         # Determine which DUT to run TODO: do this lookup more generically?
         if config_select.startswith("mvau"):
-            bench_object = bench_mvau(params, task_id, run_id, results_dir, save_dir)
+            bench_object = bench_mvau(params, task_id, run_id, artifacts_dir, save_dir)
         elif config_select.startswith("transformer"):
-            bench_object = bench_transformer(params, task_id, run_id, results_dir, save_dir)
+            bench_object = bench_transformer(params, task_id, run_id, artifacts_dir, save_dir)
         else:
             print("ERROR: unknown DUT specified")
 

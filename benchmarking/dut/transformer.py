@@ -779,7 +779,7 @@ defaults:
 """
 
 class bench_transformer(bench):
-    def step_export_onnx(self):
+    def step_export_onnx(self, output_onnx_path):
         # Load the parameters file
         #params = dvc.api.params_show("params.yaml")
         # Seed all RNGs
@@ -834,11 +834,11 @@ class bench_transformer(bench):
         np.save("out.npy", o.detach().numpy())
         # Export the model graph to QONNX
         #export_qonnx(model, (x,), "attention.onnx", **self.params["export"])
-        export_qonnx(model, (x,), "attention.onnx", 
+        export_qonnx(model, (x,), output_onnx_path, 
                     opset_version = 14, 
                     do_constant_folding = True)
 
-    def step_build(self):
+    def step_build(self, input_onnx_path, output_dir):
         #with open("params.yaml") as file:
         #    params = yaml.safe_load(file)
         # Seed all RNGs
@@ -848,6 +848,7 @@ class bench_transformer(bench):
 
         # Prepare config files
         # TODO: make configurable
+        # TODO: log intermediate files such as inp.npy, folding.yaml, or specialize_layers.jon as artifacts, maybe create in unique temp dirs
         specialize_layers_dict = {
             "Defaults": {
                 "preferred_impl_style": ["rtl", ["MVAU", "Thresholding"]]
@@ -866,10 +867,10 @@ class bench_transformer(bench):
         cfg = build_cfg.DataflowBuildConfig(
             # Unpack the build configuration parameters
             #**params["build"],
-            output_dir = "build",
+            output_dir = output_dir,
             stitched_ip_gen_dcp = False,
-            synth_clk_period_ns = 10.0, #TODO
-            board = "RFSoC2x2",
+            synth_clk_period_ns = self.clock_period_ns,
+            board = self.board,
             shell_flow_type = "vivado_zynq", #TODO: Alveo support
             folding_config_file = "folding.yaml",
             specialize_layers_config_file = "specialize_layers.json",
@@ -993,7 +994,7 @@ class bench_transformer(bench):
         )
         # Run the build process on the dummy attention operator graph
         # TODO: maybe let this function return the cfg only, so it can be modified by bench context
-        build.build_dataflow_cfg("attention.onnx", cfg)
+        build.build_dataflow_cfg(input_onnx_path, cfg)
 
     def run(self):
         self.steps_full_build_flow()

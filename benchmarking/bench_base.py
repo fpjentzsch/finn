@@ -7,6 +7,7 @@ import time
 import traceback
 import glob
 from shutil import copy as shcopy
+from shutil import copytree
 import finn.core.onnx_exec as oxe
 from qonnx.custom_op.registry import getCustomOp
 from qonnx.transformation.base import Transformation
@@ -38,11 +39,11 @@ import onnxruntime as ort
 class MakeZYNQHarnessProject(Transformation):
     """Based on MakeZYNQProject transformation, but integrates IP into test harness instead of DMA shell."""
 
-    def __init__(self, platform, results_dir, save_dir, run_id, dut_duplication=1, clock_period_ns=10):
+    def __init__(self, platform, artifacts_dir, separate_bistream_dir, run_id, dut_duplication=1, clock_period_ns=10):
         super().__init__()
         self.platform = platform
-        self.results_dir = results_dir
-        self.save_dir = save_dir
+        self.artifacts_dir = artifacts_dir
+        self.separate_bistream_dir = separate_bistream_dir
         self.run_id = run_id
         self.dut_duplication = dut_duplication
         self.clock_period_ns = clock_period_ns
@@ -415,15 +416,15 @@ class MakeZYNQHarnessProject(Transformation):
         process_compile.communicate()
 
         # collect results
-        results_dir_bitstreams = os.path.join(self.results_dir, "bitstreams")
-        os.makedirs(results_dir_bitstreams, exist_ok=True)
+        artifacts_dir_bitstreams = os.path.join(self.artifacts_dir, "bitstreams")
+        os.makedirs(artifacts_dir_bitstreams, exist_ok=True)
 
         bitfile_name = vivado_pynq_proj_dir + "/finn_zynq_link.runs/impl_1/top_wrapper.bit"
         if not os.path.isfile(bitfile_name):
             raise Exception(
                 "Synthesis failed, no bitfile found. Check logs under %s" % vivado_pynq_proj_dir
             )
-        deploy_bitfile_name = results_dir_bitstreams + "/run_%d.bit" % self.run_id
+        deploy_bitfile_name = artifacts_dir_bitstreams + "/run_%d.bit" % self.run_id
         shcopy(bitfile_name, deploy_bitfile_name)
 
         hwh_name = vivado_pynq_proj_dir + "/finn_zynq_link.gen/sources_1/bd/top/hw_handoff/top.hwh"
@@ -431,22 +432,22 @@ class MakeZYNQHarnessProject(Transformation):
             raise Exception(
                 "Synthesis failed, no hwh file found. Check logs under %s" % vivado_pynq_proj_dir
             )
-        deploy_hwh_name = results_dir_bitstreams + "/run_%d.hwh" % self.run_id
+        deploy_hwh_name = artifacts_dir_bitstreams + "/run_%d.hwh" % self.run_id
         shcopy(hwh_name, deploy_hwh_name)
 
         synth_report_filename = vivado_pynq_proj_dir + "/synth_report.xml"
-        deploy_synth_report_filename = results_dir_bitstreams + "/run_%d.xml" % self.run_id
+        deploy_synth_report_filename = artifacts_dir_bitstreams + "/run_%d.xml" % self.run_id
         shcopy(synth_report_filename, deploy_synth_report_filename)
 
         # copy additionally to a separate PFS location for measurement automation to pick it up
         # TODO: make this more configurable or switch to job/artifact based power measurement 
-        shcopy(deploy_bitfile_name, self.save_dir)
-        shcopy(deploy_hwh_name, self.save_dir)
-        shcopy(deploy_synth_report_filename, self.save_dir)
+        shcopy(deploy_bitfile_name, self.separate_bistream_dir)
+        shcopy(deploy_hwh_name, self.separate_bistream_dir)
+        shcopy(deploy_synth_report_filename, self.separate_bistream_dir)
 
         clock_period_mhz = int(1.0 / self.clock_period_ns * 1000.0)
         measurement_settings = {"freq_mhz": clock_period_mhz}
-        with open(os.path.join(self.save_dir, "run_%d_settings.json"%self.run_id), "w") as f:
+        with open(os.path.join(self.separate_bistream_dir, "run_%d_settings.json"%self.run_id), "w") as f:
             json.dump(measurement_settings, f, indent=2)
 
         # model.set_metadata_prop("bitfile", deploy_bitfile_name)
@@ -527,24 +528,27 @@ def sim_power_report(results_path, project_path, in_width, out_width, dtype_widt
         json_file.write(json.dumps(power_report_dict, indent=2))
 
 class bench():
-    def __init__(self, params, task_id, run_id, results_dir, save_dir):
+    def __init__(self, params, task_id, run_id, artifacts_dir, save_dir):
         super().__init__()
         self.params = params
         self.task_id = task_id
         self.run_id = run_id
-        self.results_dir = results_dir
+        self.artifacts_dir = artifacts_dir
         self.save_dir = save_dir
 
         # General configuration
         self.board = "RFSoC2x2"
         self.part = "xczu28dr-ffvg1517-2-e"  # TODO: make configurable, + Alveo support?
-        self.clock_period_ns = 5
+        self.clock_period_ns = 10
 
         # Initialize output directories (might exist from other runs of the same job)
-        self.results_dir_models = os.path.join(self.results_dir, "models")
-        os.makedirs(self.results_dir_models, exist_ok=True)
-        self.results_dir_power = os.path.join(self.results_dir, "power", "run_%d" % (self.run_id))
-        os.makedirs(self.results_dir_power, exist_ok=True)
+        self.artifacts_dir_models = os.path.join(self.artifacts_dir, "models")
+        os.makedirs(self.artifacts_dir_models, exist_ok=True)
+        self.artifacts_dir_power = os.path.join(self.artifacts_dir, "power_vivado", "run_%d" % (self.run_id))
+        os.makedirs(self.artifacts_dir_power, exist_ok=True)
+
+        self.save_dir_bitstreams = os.path.join(self.save_dir, "bitstreams")
+        os.makedirs(self.save_dir_bitstreams, exist_ok=True)
 
         # Intermediate models saved between steps
         # TODO: create setter functions for intermediate models or other artifacts that log them to gitlab artifacts or local dir automatically
@@ -554,7 +558,17 @@ class bench():
 
         # Initialize dictionary to collect all benchmark results
         self.output_dict = {}
-    
+
+    def save_artifact(self, name, source_path):
+        target_path = os.path.join(self.artifacts_dir, name, "run_%d" % (self.run_id))
+        os.makedirs(target_path, exist_ok=True)
+        copytree(source_path, target_path, dirs_exist_ok=True)
+
+    def save_local_artifact(self, name, source_path):
+        target_path = os.path.join(self.save_dir, name, "run_%d" % (self.run_id))
+        os.makedirs(target_path, exist_ok=True)
+        copytree(source_path, target_path, dirs_exist_ok=True)
+
     def step_make_model(self):
         # may be implemented in subclass
         pass
@@ -643,7 +657,7 @@ class bench():
         ooc_synth_results = eval(model.get_metadata_prop("res_total_ooc_synth"))
 
         start_test_batch_fast(
-            results_path=self.results_dir_power,
+            results_path=self.artifacts_dir_power,
             project_path=os.path.join(
                 ooc_synth_results["vivado_proj_folder"], "vivadocompile", "vivadocompile.xpr"
             ),
@@ -653,7 +667,7 @@ class bench():
 
         # Log most important power results directly (refer to detailed logs for more)
         for reportname in ["25_0.5", "50_0.5", "75_0.5"]:
-            with open(os.path.join(self.results_dir_power, "%s.json" % reportname), "r") as f:
+            with open(os.path.join(self.artifacts_dir_power, "%s.json" % reportname), "r") as f:
                 report = json.load(f)
                 power = float(report["Summary"]["tables"][0]["Total On-Chip Power (W)"][0])
                 power_dyn = float(report["Summary"]["tables"][0]["Dynamic (W)"][0])
@@ -664,7 +678,7 @@ class bench():
         self.output_dict["ooc_synth_time"] = int(time.time() - start_time)
 
         # Save model for logging purposes
-        model.save(os.path.join(self.results_dir_models, "model_%d_synthesis.onnx" % (self.run_id)))
+        model.save(os.path.join(self.artifacts_dir_models, "model_%d_synthesis.onnx" % (self.run_id)))
         self.model_step_synthesis = copy.deepcopy(model)
 
     def step_sim_power(self):
@@ -684,7 +698,7 @@ class bench():
         input_node_inst = getCustomOp(model.find_consumer(input_tensor.name))
         output_node_inst = getCustomOp(model.find_producer(output_tensor.name))
         sim_power_report(
-            results_path=self.results_dir_power,
+            results_path=self.artifacts_dir_power,
             project_path=os.path.join(
                 self.output_dict["ooc_synth"]["vivado_proj_folder"], "vivadocompile", "vivadocompile.xpr"
             ),
@@ -696,7 +710,7 @@ class bench():
 
         # Log most important power results directly (refer to detailed logs for more)
         for reportname in ["sim"]:
-            with open(os.path.join(self.results_dir_power, "%s.json" % reportname), "r") as f:
+            with open(os.path.join(self.artifacts_dir_power, "%s.json" % reportname), "r") as f:
                 report = json.load(f)
                 power = float(report["Summary"]["tables"][0]["Total On-Chip Power (W)"][0])
                 power_dyn = float(report["Summary"]["tables"][0]["Dynamic (W)"][0])
@@ -722,8 +736,8 @@ class bench():
         model = model.transform(
             MakeZYNQHarnessProject(
                 platform=self.board,
-                results_dir=self.results_dir,
-                save_dir=self.save_dir,
+                artifacts_dir=self.artifacts_dir,
+                separate_bistream_dir=self.save_dir_bitstreams,
                 run_id=self.run_id,
                 dut_duplication=dut_duplication,
                 clock_period_ns=self.clock_period_ns
@@ -733,7 +747,7 @@ class bench():
         self.output_dict["synth_power_time"] = int(time.time() - start_time)
 
         # Save model for logging purposes
-        model.save(os.path.join(self.results_dir_models, "model_%d_synth_power.onnx" % (self.run_id)))
+        model.save(os.path.join(self.artifacts_dir_models, "model_%d_synth_power.onnx" % (self.run_id)))
 
     def step_parse_builder_output(self):
         # Used to parse selected reports/logs into the output json dict for DUTs that use a full FINN builder flow
@@ -782,7 +796,7 @@ class bench():
         # Save model for logging purposes
         # TODO: benchmarking infrastructure could be integrated deeper into ONNX IR and FINN custom_op/transformation infrastructure
         # E.g. parameters and paths could be stored as onnx attributes and benchmarking steps as generic or specialized custom_op transformations
-        model.save(os.path.join(self.results_dir_models, "model_%d_initial.onnx" % (self.run_id)))
+        model.save(os.path.join(self.artifacts_dir_models, "model_%d_initial.onnx" % (self.run_id)))
 
         # Save model for use in other steps
         self.model_initial = model
@@ -806,8 +820,14 @@ class bench():
 
     def steps_full_build_flow(self):
         # Default step sequence for benchmarking a full FINN builder flow
-        self.step_export_onnx()
+        onnx_export_path = "model_export.onnx"
+        build_dir = "build_output"
+        #TODO: put in isolated temp dirs?
 
-        self.step_build()
+        self.step_export_onnx(onnx_export_path)
+        self.save_local_artifact("model_step_export", onnx_export_path)
+
+        self.step_build(onnx_export_path, build_dir)
+        self.save_local_artifact("build_output", build_dir)
 
         self.step_parse_builder_output()

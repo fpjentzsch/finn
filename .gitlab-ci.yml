@@ -44,10 +44,10 @@ FINN Benchmark Suite:
   script:
     - ./run-docker.sh python benchmarking/bench.py
   artifacts:
-    name: "bench_results_raw"
+    name: "bench_artifacts"
     when: always
     paths:
-      - bench_results/
+      - bench_artifacts/
 
 Collect Results:
   id_tokens:
@@ -57,12 +57,12 @@ Collect Results:
   tags:
     - image_build
   script:
-    - python benchmarking/collect.py bench_results/results bench_results/bench_results.json
+    - python benchmarking/collect.py bench_artifacts/tasks_output bench_results.json
   artifacts:
     name: "bench_results"
     when: always
     paths:
-      - bench_results/bench_results.json
+      - bench_results.json
 
 #TODO: more control via (optional) variables
 #TODO: enable json config file input
