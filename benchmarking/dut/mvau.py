@@ -19,9 +19,9 @@ from finn.transformation.fpgadataflow.minimize_accumulator_width import (
 from finn.transformation.fpgadataflow.minimize_weight_bit_width import (
     MinimizeWeightBitWidth,
 )
-import bench
+from bench_base import bench
 
-class bench_mvau(bench.bench):
+class bench_mvau(bench):
 
     def _make_single_mvau_model(
         W,

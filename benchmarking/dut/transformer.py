@@ -23,8 +23,7 @@ import json
 import finn.builder.build_dataflow as build
 import finn.builder.build_dataflow_config as build_cfg
 from finn.builder.build_dataflow_config import AutoFIFOSizingMethod
-
-import bench
+from bench_base import bench
 
 # Custom build steps required to streamline and convert the attention operator
 from dut.transformer_custom_steps import (
@@ -779,7 +778,7 @@ template_folding_yaml = """
     # ...
     """
 
-class bench_transformer(bench.bench):
+class bench_transformer(bench):
     def step_export_onnx(self):
         # Load the parameters file
         #params = dvc.api.params_show("params.yaml")
@@ -993,6 +992,7 @@ class bench_transformer(bench.bench):
             ]
         )
         # Run the build process on the dummy attention operator graph
+        # TODO: maybe let this function return the cfg only, so it can be modified by bench context
         build.build_dataflow_cfg("attention.onnx", cfg)
 
     def run(self):
