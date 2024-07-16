@@ -33,18 +33,19 @@ from qonnx.util.basic import (
     gen_finn_dt_tensor,
     roundup_to_integer_multiple,
 )
+from finn.analysis.fpgadataflow.post_synth_res import post_synth_res
+from qonnx.core.modelwrapper import ModelWrapper
+from finn.builder.build_dataflow_config import DataflowBuildConfig
 import pandas as pd
 import onnxruntime as ort
 
 class MakeZYNQHarnessProject(Transformation):
     """Based on MakeZYNQProject transformation, but integrates IP into test harness instead of DMA shell."""
 
-    def __init__(self, platform, artifacts_dir, separate_bistream_dir, run_id, dut_duplication=1, clock_period_ns=10):
+    def __init__(self, platform, output_dir, dut_duplication=1, clock_period_ns=10):
         super().__init__()
         self.platform = platform
-        self.artifacts_dir = artifacts_dir
-        self.separate_bistream_dir = separate_bistream_dir
-        self.run_id = run_id
+        self.output_dir = output_dir
         self.dut_duplication = dut_duplication
         self.clock_period_ns = clock_period_ns
 
@@ -58,11 +59,13 @@ class MakeZYNQHarnessProject(Transformation):
         global_clk_ns = 0
 
         # assume single stitched-ip (previously dataflowpartition) as DUT
-        node = model.graph.node[0]
-        node_inst = getCustomOp(node)
-        instream_width = node_inst.get_instream_width_padded()
-        outstream_width = node_inst.get_outstream_width_padded()
-        # TODO: make compatible with multi-layer DUTs
+        # assume single primary input/output
+        input_tensor = model.graph.input[0]
+        output_tensor = model.graph.output[0]
+        input_node_inst = getCustomOp(model.find_consumer(input_tensor.name))
+        output_node_inst = getCustomOp(model.find_producer(output_tensor.name))
+        instream_width = input_node_inst.get_instream_width_padded()
+        outstream_width = output_node_inst.get_outstream_width_padded()
 
         # assert node.op_type == "StreamingDataflowPartition", "Invalid link graph"
         # sdp_node = getCustomOp(node)
@@ -72,13 +75,11 @@ class MakeZYNQHarnessProject(Transformation):
 
         ipstitch_path = kernel_model.get_metadata_prop("vivado_stitch_proj")
         if ipstitch_path is None or (not os.path.isdir(ipstitch_path)):
-            raise Exception(
-                "No stitched IPI design found for %s, apply CreateStitchedIP first." % node.name
-            )
+            raise Exception("No stitched IPI design found, apply CreateStitchedIP first.")
 
         vivado_stitch_vlnv = kernel_model.get_metadata_prop("vivado_stitch_vlnv")
         if vivado_stitch_vlnv is None:
-            raise Exception("No vlnv found for %s, apply CreateStitchedIP first." % node.name)
+            raise Exception("No vlnv found, apply CreateStitchedIP first.")
 
         ip_dirs = ["list"]
         ip_dirs += collect_ip_dirs(kernel_model, ipstitch_path)
@@ -416,44 +417,44 @@ class MakeZYNQHarnessProject(Transformation):
         process_compile.communicate()
 
         # collect results
-        artifacts_dir_bitstreams = os.path.join(self.artifacts_dir, "bitstreams")
-        os.makedirs(artifacts_dir_bitstreams, exist_ok=True)
+        os.makedirs(self.output_dir, exist_ok=True)
 
         bitfile_name = vivado_pynq_proj_dir + "/finn_zynq_link.runs/impl_1/top_wrapper.bit"
         if not os.path.isfile(bitfile_name):
             raise Exception(
                 "Synthesis failed, no bitfile found. Check logs under %s" % vivado_pynq_proj_dir
             )
-        deploy_bitfile_name = artifacts_dir_bitstreams + "/run_%d.bit" % self.run_id
-        shcopy(bitfile_name, deploy_bitfile_name)
-
         hwh_name = vivado_pynq_proj_dir + "/finn_zynq_link.gen/sources_1/bd/top/hw_handoff/top.hwh"
         if not os.path.isfile(hwh_name):
             raise Exception(
                 "Synthesis failed, no hwh file found. Check logs under %s" % vivado_pynq_proj_dir
             )
-        deploy_hwh_name = artifacts_dir_bitstreams + "/run_%d.hwh" % self.run_id
-        shcopy(hwh_name, deploy_hwh_name)
-
         synth_report_filename = vivado_pynq_proj_dir + "/synth_report.xml"
-        deploy_synth_report_filename = artifacts_dir_bitstreams + "/run_%d.xml" % self.run_id
-        shcopy(synth_report_filename, deploy_synth_report_filename)
 
-        # copy additionally to a separate PFS location for measurement automation to pick it up
-        # TODO: make this more configurable or switch to job/artifact based power measurement 
-        shcopy(deploy_bitfile_name, self.separate_bistream_dir)
-        shcopy(deploy_hwh_name, self.separate_bistream_dir)
-        shcopy(deploy_synth_report_filename, self.separate_bistream_dir)
+        shcopy(bitfile_name, self.output_dir)
+        shcopy(hwh_name, self.output_dir)
+        shcopy(synth_report_filename, self.output_dir)
 
-        clock_period_mhz = int(1.0 / self.clock_period_ns * 1000.0)
-        measurement_settings = {"freq_mhz": clock_period_mhz}
-        with open(os.path.join(self.separate_bistream_dir, "run_%d_settings.json"%self.run_id), "w") as f:
-            json.dump(measurement_settings, f, indent=2)
+        post_synth_resources = model.analysis(post_synth_res)
+        with open(self.output_dir + "/post_synth_resources.json", "w") as f:
+                json.dump(post_synth_resources, f, indent=2)
 
+        timing_rpt = ("%s/finn_zynq_link.runs/impl_1/top_wrapper_timing_summary_routed.rpt"% vivado_pynq_proj_dir)
+        shcopy(timing_rpt, self.output_dir + "/post_route_timing.rpt")
+        
         # model.set_metadata_prop("bitfile", deploy_bitfile_name)
         # model.set_metadata_prop("hw_handoff", deploy_hwh_name)
         # model.set_metadata_prop("vivado_synth_rpt", synth_report_filename)
         return (model, False)
+
+def step_synth_harness(model: ModelWrapper, cfg: DataflowBuildConfig):
+    # Build step version of above transformation (used for full builds)
+    model = model.transform(MakeZYNQHarnessProject(
+                platform=cfg.board,
+                output_dir=os.path.join(cfg.output_dir, "harness"),
+                #dut_duplication=dut_duplication, #TODO: enable for full builds
+                clock_period_ns=cfg.synth_clk_period_ns
+            ))
 
 def start_test_batch_fast(results_path, project_path, run_target, pairs):
     # Prepare tcl script
@@ -653,7 +654,8 @@ class bench():
 
     def step_synthesis(self):
         # Perform Vivado synthesis for accurate resource/timing and inaccurate power reports
-
+        # TODO: avoid duplicate synthesis by using shell build also for post_synth_resources and power sim?
+        # TODO: check OMX synth strategy again!
         start_time = time.time()
         print("Performing Vivado (stitched-ip, out-of-context) synthesis")
         model = self.model_step_hls
@@ -739,16 +741,31 @@ class bench():
     
         model = self.model_step_hls.transform(ReplaceVerilogRelPaths())
         model = model.transform(CreateStitchedIP(self.part, self.clock_period_ns))
+
+        build_dir = "temp_output_harness_build"
+        #TODO: if synth fails this could contain stale bitstreams which will be power tested
         model = model.transform(
             MakeZYNQHarnessProject(
                 platform=self.board,
-                artifacts_dir=self.artifacts_dir,
-                separate_bistream_dir=self.save_dir_bitstreams,
-                run_id=self.run_id,
+                output_dir=build_dir,
                 dut_duplication=dut_duplication,
                 clock_period_ns=self.clock_period_ns
             )
         )
+
+        # COPY bitstreams and other outputs
+        # TODO: integrate better (e.g. as artifact) and remove redundant copy
+        # TODO: make this more configurable or switch to job/artifact based power measurement 
+        shcopy(os.path.join(build_dir, "top_wrapper.bit"), 
+               os.path.join(self.save_dir_bitstreams, "run_%d.bit" % self.run_id))
+        shcopy(os.path.join(build_dir, "top.hwh"), 
+               os.path.join(self.save_dir_bitstreams, "run_%d.hwh" % self.run_id))
+        shcopy(os.path.join(build_dir, "synth_report.xml"), 
+               os.path.join(self.save_dir_bitstreams, "run_%d.xml" % self.run_id))
+        clock_period_mhz = int(1.0 / self.clock_period_ns * 1000.0)
+        measurement_settings = {"freq_mhz": clock_period_mhz}
+        with open(os.path.join(self.save_dir_bitstreams, "run_%d_settings.json"%self.run_id), "w") as f:
+            json.dump(measurement_settings, f, indent=2)
 
         self.output_dict["synth_power_time"] = int(time.time() - start_time)
 
@@ -757,6 +774,20 @@ class bench():
 
     def step_parse_builder_output(self, build_dir):
         # Used to parse selected reports/logs into the output json dict for DUTs that use a full FINN builder flow
+
+        # COPY bitstreams and other outputs
+        # TODO: integrate better (e.g. as artifact) and remove redundant copy
+        # TODO: make this more configurable or switch to job/artifact based power measurement 
+        shcopy(os.path.join(build_dir, "harness/top_wrapper.bit"), 
+               os.path.join(self.save_dir_bitstreams, "run_%d.bit" % self.run_id))
+        shcopy(os.path.join(build_dir, "harness/top.hwh"), 
+               os.path.join(self.save_dir_bitstreams, "run_%d.hwh" % self.run_id))
+        shcopy(os.path.join(build_dir, "harness/synth_report.xml"), 
+               os.path.join(self.save_dir_bitstreams, "run_%d.xml" % self.run_id))
+        clock_period_mhz = int(1.0 / self.clock_period_ns * 1000.0)
+        measurement_settings = {"freq_mhz": clock_period_mhz}
+        with open(os.path.join(self.save_dir_bitstreams, "run_%d_settings.json"%self.run_id), "w") as f:
+            json.dump(measurement_settings, f, indent=2)
 
         # CHECK FOR VERIFICATION STEP SUCCESS
         # Collect all verification output filenames
@@ -772,7 +803,8 @@ class bench():
         # TODO: mark job as failed if verification fails
 
         # PARSE LOGS
-        report_path = os.path.join(build_dir, "report/post_synth_resources.json")
+        report_path = os.path.join(build_dir, "harness/post_synth_resources.json") 
+        # TODO: check multiple possible sources for this log (e.g. if OOC synth or Zynbuild was run)
         report_filter = "(top)"
         # Open the report file
         with open(report_path) as file:

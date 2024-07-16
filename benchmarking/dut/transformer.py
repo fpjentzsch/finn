@@ -23,7 +23,7 @@ import json
 import finn.builder.build_dataflow as build
 import finn.builder.build_dataflow_config as build_cfg
 from finn.builder.build_dataflow_config import AutoFIFOSizingMethod
-from bench_base import bench
+from bench_base import bench, step_synth_harness
 
 # Custom build steps required to streamline and convert the attention operator
 from dut.transformer_custom_steps import (
@@ -884,10 +884,12 @@ class bench_transformer(bench):
             # Generate and keep the intermediate outputs including reports
             generate_outputs=[
                 build_cfg.DataflowOutputType.ESTIMATE_REPORTS,
-                build_cfg.DataflowOutputType.STITCHED_IP,
+                build_cfg.DataflowOutputType.STITCHED_IP, # required for HarnessBuild, OOC_SYNTH, and RTLSIM
                 build_cfg.DataflowOutputType.PYNQ_DRIVER,
-                build_cfg.DataflowOutputType.BITFILE,
-                build_cfg.DataflowOutputType.DEPLOYMENT_PACKAGE,
+                #build_cfg.DataflowOutputType.OOC_SYNTH, # requires stitched-ip, not needed because ZynqBuild/HarnessBuild is performed
+                #build_cfg.DataflowOutputType.BITFILE, # does not require stitched-ip, not needed because HarnessBuild is performed
+                #build_cfg.DataflowOutputType.RTLSIM_PERFORMANCE, # not possible due to float components
+                #build_cfg.DataflowOutputType.DEPLOYMENT_PACKAGE # not needed, just a copy operation
             ],
             # Steps after which verification should be run
             verify_steps=[
@@ -986,6 +988,8 @@ class bench_transformer(bench):
                 # Attention does currently not support RTL simulation due to missing
                 # float IPs.
                 # "step_measure_rtlsim_performance",
+                # Insert custom step instead of usual Shell build:
+                step_synth_harness,
                 "step_out_of_context_synthesis",
                 "step_synthesize_bitfile",
                 "step_make_pynq_driver",
