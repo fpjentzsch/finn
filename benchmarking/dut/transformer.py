@@ -686,8 +686,8 @@ def patch_non_affine_norms(model: torch.nn.Module):  # noqa: Shadows model
     return model
 
 template_folding_yaml = """
-    # Per operator type default configurations
-    defaults:
+# Per operator type default configurations
+defaults:
     # Scaled dot-product attention head implemented via HLS
     ScaledDotProductAttention_hls:
         # Type of memory to be used for internal buffer storage
@@ -776,7 +776,7 @@ template_folding_yaml = """
         ram_style: distributed
     # Individual, named node-specific configurations here
     # ...
-    """
+"""
 
 class bench_transformer(bench):
     def step_export_onnx(self):
