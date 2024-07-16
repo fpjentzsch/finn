@@ -23,8 +23,8 @@ from finn.analysis.fpgadataflow.hls_synth_res_estimation import hls_synth_res_es
 from finn.analysis.fpgadataflow.res_estimation import res_estimation
 from finn.transformation.fpgadataflow.make_zynq_proj import collect_ip_dirs
 from finn.util.basic import make_build_dir, pynq_native_port_width, pynq_part_map
-from dut.mvau import bench_mvau
-from dut.transformer import bench_transformer
+import dut.mvau
+import dut.transformer
 from templates import template_open, template_single_test, template_sim_power, template_switching_simulation_tb, zynq_harness_template
 from util import summarize_table, summarize_section, power_xml_to_dict, prepare_inputs
 from finn.transformation.fpgadataflow.replace_verilog_relpaths import (
@@ -925,9 +925,9 @@ def main():
 
         # Determine which DUT to run TODO: do this lookup more generically?
         if config_select.startswith("mvau"):
-            bench_object = bench_mvau(params, task_id, run_id, results_dir, save_dir)
+            bench_object = dut.mvau.bench_mvau(params, task_id, run_id, results_dir, save_dir)
         elif config_select.startswith("transformer"):
-            bench_object = bench_transformer(params, task_id, run_id, results_dir, save_dir)
+            bench_object = dut.transformer.bench_transformer(params, task_id, run_id, results_dir, save_dir)
         else:
             print("ERROR: unknown DUT specified")
 

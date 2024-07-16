@@ -779,7 +779,7 @@ template_folding_yaml = """
     # ...
     """
 
-class bench_transformer(bench):
+class bench_transformer(bench.bench):
     def step_export_onnx(self):
         # Load the parameters file
         #params = dvc.api.params_show("params.yaml")

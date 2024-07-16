@@ -21,7 +21,7 @@ from finn.transformation.fpgadataflow.minimize_weight_bit_width import (
 )
 import bench
 
-class bench_mvau(bench):
+class bench_mvau(bench.bench):
 
     def _make_single_mvau_model(
         W,
