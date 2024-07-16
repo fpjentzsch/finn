@@ -23,8 +23,8 @@ from finn.analysis.fpgadataflow.hls_synth_res_estimation import hls_synth_res_es
 from finn.analysis.fpgadataflow.res_estimation import res_estimation
 from finn.transformation.fpgadataflow.make_zynq_proj import collect_ip_dirs
 from finn.util.basic import make_build_dir, pynq_native_port_width, pynq_part_map
-from dut.mvau import make_mvau_dut
-from dut.transformer import make_transformer_dut, build_transformer
+from dut.mvau import bench_mvau
+from dut.transformer import bench_transformer
 from templates import template_open, template_single_test, template_sim_power, template_switching_simulation_tb, zynq_harness_template
 from util import summarize_table, summarize_section, power_xml_to_dict, prepare_inputs
 from finn.transformation.fpgadataflow.replace_verilog_relpaths import (
@@ -529,9 +529,8 @@ def sim_power_report(results_path, project_path, in_width, out_width, dtype_widt
         json_file.write(json.dumps(power_report_dict, indent=2))
 
 class bench():
-    def __init__(self, dut, params, task_id, run_id, results_dir, save_dir):
+    def __init__(self, params, task_id, run_id, results_dir, save_dir):
         super().__init__()
-        self.dut = dut
         self.params = params
         self.task_id = task_id
         self.run_id = run_id
@@ -550,6 +549,7 @@ class bench():
         os.makedirs(self.results_dir_power, exist_ok=True)
 
         # Intermediate models saved between steps
+        # TODO: create setter functions for intermediate models or other artifacts that log them to gitlab artifacts or local dir automatically
         self.model_initial = None
         self.model_step_hls = None
         self.model_step_synthesis = None
@@ -557,31 +557,21 @@ class bench():
         # Initialize dictionary to collect all benchmark results
         self.output_dict = {}
     
-    def step_make_dut(self):
-        # Make DUT TODO: implement these DUT-specific functions in respective subclasses
-        if self.dut == "mvau":
-            model, dut_info = make_mvau_dut(self.params)
-            self.target_node = "MVAU_hls" # display results of analysis passes only for the first occurence of this op type
-        elif self.dut == "transformer":
-            make_transformer_dut(self.params)
-            build_transformer(self.params)
-            model = None
-            dut_info = {}
-            self.target_node = None # aggregate results of analysis passes over all nodes in the DUT
-        else:
-            print("ERROR: unknown DUT specified")
+    def step_make_model(self):
+        # may be implemented in subclass
+        pass
 
-        # Save model for logging purposes
-        # TODO: benchmarking infrastructure could be integrated deeper into ONNX IR and FINN custom_op/transformation infrastructure
-        # E.g. parameters and paths could be stored as onnx attributes and benchmarking steps as generic or specialized custom_op transformations
-        model.save(os.path.join(self.results_dir_models, "model_%d_initial.onnx" % (self.run_id)))
+    def step_export_onnx(self):
+        # may be implemented in subclass
+        pass
 
-        # Save model for use in other steps
-        self.model_initial = model
+    def step_build(self):
+        # may be implemented in subclass
+        pass
 
-        # Log dict reported by DUT-specific scripts to overall result dict
-        # E.g. this could contain SIMD/PE derived from folding factors or weight distribution information
-        self.output_dict["info"] = dut_info
+    def run(self):
+        # must be implemented in subclass
+        pass
 
     def step_finn_estimate(self):
         # Gather FINN estimates
@@ -780,16 +770,8 @@ class bench():
         
         self.output_dict["builder"] = summary.to_dict()
 
-    def run(self):
-        # Attempt to work around onnxruntime issue on Slurm-managed clusters:
-        # See https://github.com/microsoft/onnxruntime/issues/8313
-        _default_session_options = ort.capi._pybind_state.get_default_session_options()
-        def get_default_session_options_new():
-            _default_session_options.inter_op_num_threads = 1
-            _default_session_options.intra_op_num_threads = 1
-            return _default_session_options
-        ort.capi._pybind_state.get_default_session_options = get_default_session_options_new
-
+    def steps_simple_model_flow(self):
+        # Default step sequence for benchmarking a simple model (mostly single operators/custom_ops)
         do_hls = self.params["do_hls"] if "do_hls" in self.params else False
         do_rtlsim = self.params["do_rtlsim"] if "do_rtlsim" in self.params else False
         do_synthesis = self.params["do_synthesis"] if "do_synthesis" in self.params else False
@@ -797,13 +779,21 @@ class bench():
         do_synth_power = self.params["do_synth_power"] if "do_synth_power" in self.params else False
 
         # Perform steps
-        self.step_make_dut()
-        #TODO: use sub classes for single-node flows and full builder flows
-        if self.dut == "mvau":
-            self.step_finn_estimate()
+        model, dut_info = self.step_make_model()
 
-        if self.dut == "transformer":
-            self.step_parse_builder_output()
+        # Save model for logging purposes
+        # TODO: benchmarking infrastructure could be integrated deeper into ONNX IR and FINN custom_op/transformation infrastructure
+        # E.g. parameters and paths could be stored as onnx attributes and benchmarking steps as generic or specialized custom_op transformations
+        model.save(os.path.join(self.results_dir_models, "model_%d_initial.onnx" % (self.run_id)))
+
+        # Save model for use in other steps
+        self.model_initial = model
+
+        # Log dict reported by DUT-specific scripts to overall result dict
+        # E.g. this could contain SIMD/PE derived from folding factors or weight distribution information
+        self.output_dict["info"] = dut_info
+
+        self.step_finn_estimate()
 
         if do_hls:
             self.step_hls()
@@ -816,10 +806,24 @@ class bench():
         if do_synth_power:
             self.step_synth_power()
 
-        return self.output_dict
+    def steps_full_build_flow(self):
+        # Default step sequence for benchmarking a full FINN builder flow
+        self.step_export_onnx()
 
+        self.step_build
+
+        self.step_parse_builder_output()
 
 def main():
+    # Attempt to work around onnxruntime issue on Slurm-managed clusters:
+    # See https://github.com/microsoft/onnxruntime/issues/8313
+    _default_session_options = ort.capi._pybind_state.get_default_session_options()
+    def get_default_session_options_new():
+        _default_session_options.inter_op_num_threads = 1
+        _default_session_options.intra_op_num_threads = 1
+        return _default_session_options
+    ort.capi._pybind_state.get_default_session_options = get_default_session_options_new
+
     # Gather job array info
     job_id = int(os.environ["SLURM_JOB_ID"])
     print("Job launched with ID: %d" % (job_id))
@@ -865,15 +869,6 @@ def main():
             config_select = config
             break
 
-    # Determine which DUT to run
-    if config_select.startswith("mvau"):
-        dut = "mvau"
-    elif config_select.startswith("transformer"):
-        dut = "transformer"
-    else:
-        print("ERROR: unknown DUT specified")
-    print("Running benchmark for design-under-test %s" % (dut))
-
     # Load config (given relative to this script)
     config_path = os.path.join(configs_path, config_select)
     print("Loading config %s" % (config_path))
@@ -915,6 +910,7 @@ def main():
     print("This job will perform %d out of %d total runs" % (len(selected_runs), total_runs))
 
     # Run benchmark
+    # TODO: integrate this loop (especially status logging) into the bench class
     log = []
     for run, run_id in enumerate(selected_runs):
         print(
@@ -927,9 +923,16 @@ def main():
 
         log_dict = {"run_id": run_id, "task_id": task_id, "params": params}
 
+        # Determine which DUT to run TODO: do this lookup more generically?
+        if config_select.startswith("mvau"):
+            bench_object = bench_mvau(params, task_id, run_id, results_dir, save_dir)
+        elif config_select.startswith("transformer"):
+            bench_object = bench_transformer(params, task_id, run_id, results_dir, save_dir)
+        else:
+            print("ERROR: unknown DUT specified")
+
         start_time = time.time()
         try:
-            bench_object = bench(dut, params, task_id, run_id, results_dir, save_dir)
             output_dict = bench_object.run()
             if output_dict is None:
                 output_dict = {}
