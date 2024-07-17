@@ -1,5 +1,5 @@
 # Utility functions for benchmarking
-
+import os, shutil
 from qonnx.core.datatype import DataType
 import xml.etree.ElementTree as ET
 
@@ -74,3 +74,14 @@ def prepare_inputs(input_tensor, idt, wdt):
         return {"inp": (input_tensor + 1) / 2}
     else:
         return {"inp": input_tensor}
+
+def delete_dir_contents(dir):
+    for filename in os.listdir(dir):
+        file_path = os.path.join(dir, filename)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+        except Exception as e:
+            print('Failed to delete %s. Reason: %s' % (file_path, e))

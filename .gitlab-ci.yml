@@ -14,7 +14,7 @@ variables:
     value: "8"
   PARALLEL_JOBS:
     description: "Number of parallel Slurm array jobs per CI job"
-    value: "2"
+    value: "8"
   SLURM_TIMEOUT:
     description: "Timeout"
     value: "0-12" # [days-hours]

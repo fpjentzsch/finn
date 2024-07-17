@@ -25,7 +25,7 @@ from finn.analysis.fpgadataflow.res_estimation import res_estimation
 from finn.transformation.fpgadataflow.make_zynq_proj import collect_ip_dirs
 from finn.util.basic import make_build_dir, pynq_native_port_width, pynq_part_map
 from templates import template_open, template_single_test, template_sim_power, template_switching_simulation_tb, zynq_harness_template
-from util import summarize_table, summarize_section, power_xml_to_dict, prepare_inputs
+from util import summarize_table, summarize_section, power_xml_to_dict, prepare_inputs, delete_dir_contents
 from finn.transformation.fpgadataflow.replace_verilog_relpaths import (
     ReplaceVerilogRelPaths,
 )
@@ -528,18 +528,23 @@ def sim_power_report(results_path, project_path, in_width, out_width, dtype_widt
         json_file.write(json.dumps(power_report_dict, indent=2))
 
 class bench():
-    def __init__(self, params, task_id, run_id, artifacts_dir, save_dir):
+    def __init__(self, params, task_id, run_id, artifacts_dir, save_dir, debug=True):
         super().__init__()
         self.params = params
         self.task_id = task_id
         self.run_id = run_id
         self.artifacts_dir = artifacts_dir
         self.save_dir = save_dir
+        self.debug = debug
 
         # General configuration
         self.board = "RFSoC2x2"
         self.part = "xczu28dr-ffvg1517-2-e"  # TODO: make configurable, + Alveo support?
         self.clock_period_ns = 10
+
+        # Clear FINN tmp build dir before every run (to avoid excessive ramdisk usage and duplicate debug artifacts)
+        print("Clearing FINN BUILD DIR ahead of run")
+        delete_dir_contents(os.environ["FINN_BUILD_DIR"])
 
         # Initialize output directories (might exist from other runs of the same job)
         self.artifacts_dir_models = os.path.join(self.artifacts_dir, "models")
@@ -855,16 +860,32 @@ class bench():
         if do_synth_power:
             self.step_synth_power()
 
+        if self.debug:
+            # Save entire FINN tmp build dir for debugging
+            self.save_local_artifact("finn_tmp", os.environ["FINN_BUILD_DIR"])
+            self.save_local_artifact("finn_cwd", os.path.join(os.environ["PATH_WORKDIR"], "finn"))
+            #TODO: save as early as possible or regardless of errors
+
     def steps_full_build_flow(self):
         # Default step sequence for benchmarking a full FINN builder flow
-        onnx_export_path = "model_export.onnx"
-        build_dir = "build_output"
-        #TODO: put in isolated temp dirs?
+
+        # Use a temporary dir for buildflow-related files (next to FINN_BUILD_DIR)
+        # Ensure it exists but is empty (clear potential artifacts from previous runs)
+        tmp_buildflow_dir = os.path.join(os.environ["PATH_WORKDIR"], "buildflow")
+        os.makedirs(tmp_buildflow_dir, exist_ok=True)
+        delete_dir_contents(tmp_buildflow_dir)
+        onnx_export_path = os.path.join(tmp_buildflow_dir, "model_export.onnx")
+        build_dir = os.path.join(tmp_buildflow_dir, "build_output")
 
         self.step_export_onnx(onnx_export_path)
         self.save_local_artifact("model_step_export", onnx_export_path)
 
         self.step_build(onnx_export_path, build_dir)
         self.save_local_artifact("build_output", build_dir)
+        if self.debug:
+            # Save entire FINN tmp build dir for debugging
+            self.save_local_artifact("finn_tmp", os.environ["FINN_BUILD_DIR"])
+            self.save_local_artifact("finn_cwd", os.path.join(os.environ["PATH_WORKDIR"], "finn"))
+            #TODO: save as early as possible or regardless of errors
 
         self.step_parse_builder_output(build_dir)
