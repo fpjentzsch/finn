@@ -454,6 +454,7 @@ def step_synth_harness(model: ModelWrapper, cfg: DataflowBuildConfig):
                 #dut_duplication=dut_duplication, #TODO: enable for full builds
                 clock_period_ns=cfg.synth_clk_period_ns
             ))
+    return model
 
 def start_test_batch_fast(results_path, project_path, run_target, pairs):
     # Prepare tcl script

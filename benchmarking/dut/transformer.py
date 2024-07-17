@@ -879,9 +879,8 @@ class bench_transformer(bench):
             mvau_wwidth_max = 2048,
             split_large_fifos = True,
 
-            # Print all warnings and compiler output to stdout
-            verbose=True,
-            # Generate and keep the intermediate outputs including reports
+            verbose=False, # if True prints stdout and stderr to console instead of build_dataflow.log
+
             generate_outputs=[
                 build_cfg.DataflowOutputType.ESTIMATE_REPORTS,
                 build_cfg.DataflowOutputType.STITCHED_IP, # required for HarnessBuild, OOC_SYNTH, and RTLSIM
@@ -891,7 +890,7 @@ class bench_transformer(bench):
                 #build_cfg.DataflowOutputType.RTLSIM_PERFORMANCE, # not possible due to float components
                 #build_cfg.DataflowOutputType.DEPLOYMENT_PACKAGE # not needed, just a copy operation
             ],
-            # Steps after which verification should be run
+
             verify_steps=[
                 # Verify the model after converting to the FINN onnx dialect
                 build_cfg.VerificationStepType.QONNX_TO_FINN_PYTHON,
