@@ -429,11 +429,14 @@ class MakeZYNQHarnessProject(Transformation):
             raise Exception(
                 "Synthesis failed, no hwh file found. Check logs under %s" % vivado_pynq_proj_dir
             )
-        synth_report_filename = vivado_pynq_proj_dir + "/synth_report.xml"
+        synth_report_name = vivado_pynq_proj_dir + "/synth_report.xml"
+        model.set_metadata_prop("vivado_synth_rpt", synth_report_name)
+        model.set_metadata_prop("bitfile", bitfile_name)
+        model.set_metadata_prop("hw_handoff", hwh_name)
 
         shcopy(bitfile_name, self.output_dir)
         shcopy(hwh_name, self.output_dir)
-        shcopy(synth_report_filename, self.output_dir)
+        shcopy(synth_report_name, self.output_dir)
 
         post_synth_resources = model.analysis(post_synth_res)
         with open(self.output_dir + "/post_synth_resources.json", "w") as f:
@@ -441,10 +444,6 @@ class MakeZYNQHarnessProject(Transformation):
 
         timing_rpt = ("%s/finn_zynq_link.runs/impl_1/top_wrapper_timing_summary_routed.rpt"% vivado_pynq_proj_dir)
         shcopy(timing_rpt, self.output_dir + "/post_route_timing.rpt")
-        
-        # model.set_metadata_prop("bitfile", deploy_bitfile_name)
-        # model.set_metadata_prop("hw_handoff", deploy_hwh_name)
-        # model.set_metadata_prop("vivado_synth_rpt", synth_report_filename)
         return (model, False)
 
 def step_synth_harness(model: ModelWrapper, cfg: DataflowBuildConfig):
