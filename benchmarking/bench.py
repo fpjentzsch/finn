@@ -7,6 +7,7 @@ import onnxruntime as ort
 
 from dut.mvau import bench_mvau
 from dut.transformer import bench_transformer
+from dut.transformer_radioml import bench_transformer_radioml
 
 def main():
     # Attempt to work around onnxruntime issue on Slurm-managed clusters:
@@ -122,6 +123,8 @@ def main():
             bench_object = bench_mvau(params, task_id, run_id, artifacts_dir, save_dir)
         elif config_select.startswith("transformer"):
             bench_object = bench_transformer(params, task_id, run_id, artifacts_dir, save_dir)
+        elif config_select.startswith("transformer_radioml"):
+            bench_object = bench_transformer_radioml(params, task_id, run_id, artifacts_dir, save_dir)
         else:
             print("ERROR: unknown DUT specified")
 
