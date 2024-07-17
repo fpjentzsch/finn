@@ -121,10 +121,10 @@ def main():
         # Determine which DUT to run TODO: do this lookup more generically?
         if config_select.startswith("mvau"):
             bench_object = bench_mvau(params, task_id, run_id, artifacts_dir, save_dir)
-        elif config_select.startswith("transformer"):
-            bench_object = bench_transformer(params, task_id, run_id, artifacts_dir, save_dir)
         elif config_select.startswith("transformer_radioml"):
             bench_object = bench_transformer_radioml(params, task_id, run_id, artifacts_dir, save_dir)
+        elif config_select.startswith("transformer"):
+            bench_object = bench_transformer(params, task_id, run_id, artifacts_dir, save_dir)
         else:
             print("ERROR: unknown DUT specified")
 
