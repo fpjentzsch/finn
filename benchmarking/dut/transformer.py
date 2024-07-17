@@ -884,7 +884,7 @@ class bench_transformer(bench):
             generate_outputs=[
                 build_cfg.DataflowOutputType.ESTIMATE_REPORTS,
                 build_cfg.DataflowOutputType.STITCHED_IP, # required for HarnessBuild, OOC_SYNTH, and RTLSIM
-                build_cfg.DataflowOutputType.PYNQ_DRIVER,
+                #build_cfg.DataflowOutputType.PYNQ_DRIVER, #TODO: currently broken (assert i_consumer.op_type == "StreamingDataflowPartition"), might be useful for functional verification on hw later
                 #build_cfg.DataflowOutputType.OOC_SYNTH, # requires stitched-ip, not needed because ZynqBuild/HarnessBuild is performed
                 #build_cfg.DataflowOutputType.BITFILE, # does not require stitched-ip, not needed because HarnessBuild is performed
                 #build_cfg.DataflowOutputType.RTLSIM_PERFORMANCE, # not possible due to float components

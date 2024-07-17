@@ -538,6 +538,8 @@ class bench():
         self.save_dir = save_dir
         self.debug = debug
 
+        #TODO: setup a logger so output can go to console (with task id prefix) and log simultaneously
+
         # General configuration
         self.board = "RFSoC2x2"
         self.part = "xczu28dr-ffvg1517-2-e"  # TODO: make configurable, + Alveo support?
