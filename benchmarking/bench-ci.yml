@@ -1,5 +1,5 @@
 stages:
-  - bench
+  - synth
   - measure
   - collect
 
@@ -9,13 +9,13 @@ variables:
     value: ""
 
 workflow:
-  name: "Bench $BENCH_CFG"
+  name: "bench_$BENCH_CFG"
 
-FINN Benchmark:
+FINN Build:
   id_tokens:
     CI_JOB_JWT:
       aud: https://git.uni-paderborn.de
-  stage: bench
+  stage: synth
   variables:
     SCHEDULER_PARAMETERS: "-A $PROJECT_ACCOUNT -p normal -t $SLURM_TIMEOUT $SLURM_QOS --nodes 1 --ntasks 1 --cpus-per-task $CPU_CORES --mem 128G --array 0-$( expr $PARALLEL_JOBS - 1 )"
     PYTEST_PARALLEL: "$CPU_CORES"
@@ -32,7 +32,7 @@ FINN Benchmark:
     paths:
       - bench_artifacts/
 
-Collect Results:
+Result Collection:
   id_tokens:
     CI_JOB_JWT:
       aud: https://git.uni-paderborn.de

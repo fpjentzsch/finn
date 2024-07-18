@@ -2,7 +2,7 @@ stages:
   - update
   - build
   - test
-  - bench
+  - trigger_benchmarks
 
 variables:
   PIPELINE_NAME:
@@ -27,17 +27,18 @@ variables:
 workflow:
   name: '$PIPELINE_NAME'
 
-FINN Manual Benchmark:
-  stage: bench
+Trigger Manual Benchmark:
+  stage: trigger_benchmarks
   rules:
     - if: $MANUAL_CFG_PATH != ""
   trigger:
     include: benchmarking/bench-ci.yml
   variables:
-    BENCH_CFG: "MANUAL"
+    BENCH_CFG: "manual"
+    MANUAL_CFG_PATH: $MANUAL_CFG_PATH
 
-FINN Benchmark Suite:
-  stage: bench
+Trigger Benchmark Suite:
+  stage: trigger_benchmarks
   rules:
     - if: $MANUAL_CFG_PATH == ""
   trigger:

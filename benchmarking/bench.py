@@ -54,8 +54,7 @@ def main(config_name):
     os.makedirs(save_dir, exist_ok=True)
 
     # Gather benchmarking configs
-    if os.environ.get("MANUAL_CFG_PATH") != "":
-        # could also use input argument (BENCH_CFG)
+    if config_name == "manual":
         configs_path, config_select = os.path.split(os.environ.get("MANUAL_CFG_PATH"))
     else:
         configs_path = os.path.join(os.path.dirname(__file__), "cfg")
