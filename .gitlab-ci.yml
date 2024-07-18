@@ -34,7 +34,7 @@ FINN Manual Benchmark:
   trigger:
     include: benchmarking/bench-ci.yml
   variables:
-    - BENCH_CFG: "MANUAL"
+    BENCH_CFG: "MANUAL"
 
 FINN Benchmark Suite:
   stage: bench
