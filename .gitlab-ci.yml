@@ -35,7 +35,6 @@ Trigger Manual Benchmark:
     include: benchmarking/bench-ci.yml
   variables:
     BENCH_CFG: "manual"
-    MANUAL_CFG_PATH: $MANUAL_CFG_PATH
 
 Trigger Benchmark Suite:
   stage: trigger_benchmarks
