@@ -33,6 +33,8 @@ Trigger Manual Benchmark:
     - if: $MANUAL_CFG_PATH != ""
   trigger:
     include: benchmarking/bench-ci.yml
+    forward:
+      pipeline_variables: true
   variables:
     BENCH_CFG: "manual"
 
@@ -42,6 +44,8 @@ Trigger Benchmark Suite:
     - if: $MANUAL_CFG_PATH == ""
   trigger:
     include: benchmarking/bench-ci.yml
+    forward:
+      pipeline_variables: true
   parallel:
     matrix:
       - BENCH_CFG: [mvau_test, transformer_test, transformer_sweep, transformer_radioml_all]
