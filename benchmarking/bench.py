@@ -1,4 +1,5 @@
 import itertools
+import sys
 import os
 import json
 import time
@@ -9,7 +10,7 @@ from dut.mvau import bench_mvau
 from dut.transformer import bench_transformer
 from dut.transformer_radioml import bench_transformer_radioml
 
-def main():
+def main(config_name):
     # Attempt to work around onnxruntime issue on Slurm-managed clusters:
     # See https://github.com/microsoft/onnxruntime/issues/8313
     _default_session_options = ort.capi._pybind_state.get_default_session_options()
@@ -54,16 +55,13 @@ def main():
 
     # Gather benchmarking configs
     if os.environ.get("MANUAL_CFG_PATH") != "":
+        # could also use input argument (BENCH_CFG)
         configs_path, config_select = os.path.split(os.environ.get("MANUAL_CFG_PATH"))
     else:
         configs_path = os.path.join(os.path.dirname(__file__), "cfg")
-        for config in os.listdir(configs_path):
-            # only evaluate first config file found
-            # TODO: allow arbitrary number of dut configs (maybe via spawning separate pipelines/jobs?)
-            config_select = config
-            break
+        config_select = config_name + ".json"
 
-    # Load config (given relative to this script)
+    # Load config
     config_path = os.path.join(configs_path, config_select)
     print("Loading config %s" % (config_path))
     if os.path.exists(config_path):
@@ -153,4 +151,4 @@ def main():
     print("Stopping job")
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1])

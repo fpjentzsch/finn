@@ -3,7 +3,6 @@ stages:
   - build
   - test
   - bench
-  - collect
 
 variables:
   PIPELINE_NAME:
@@ -28,44 +27,26 @@ variables:
 workflow:
   name: '$PIPELINE_NAME'
 
-FINN Benchmark Suite:
-  id_tokens:
-    CI_JOB_JWT:
-      aud: https://git.uni-paderborn.de
+FINN Manual Benchmark:
   stage: bench
+  rules:
+    - if: $MANUAL_CFG_PATH != ""
+  trigger:
+    include: benchmarking/bench-ci.yml
   variables:
-    SCHEDULER_PARAMETERS: "-A $PROJECT_ACCOUNT -p normal -t $SLURM_TIMEOUT $SLURM_QOS --nodes 1 --ntasks 1 --cpus-per-task $CPU_CORES --mem 128G --array 0-$( expr $PARALLEL_JOBS - 1 )"
-    PYTEST_PARALLEL: "$CPU_CORES"
-    FINN_SINGULARITY: "$PATH_SINGULARITY_IMG/xilinx/finn_dev.sif"
-  before_script:
-    - cp -dfR .. $PATH_WORKDIR # Copy to working directory (e.g. RAMdisk)
-    - cd $PATH_WORKDIR/finn
-    - module load system singularity
-  script:
-    - ./run-docker.sh python benchmarking/bench.py
-  artifacts:
-    name: "bench_artifacts"
-    when: always
-    paths:
-      - bench_artifacts/
+    - BENCH_CFG: "MANUAL"
 
-Collect Results:
-  id_tokens:
-    CI_JOB_JWT:
-      aud: https://git.uni-paderborn.de
-  stage: collect
-  tags:
-    - image_build
-  script:
-    - python benchmarking/collect.py bench_artifacts/tasks_output bench_results.json
-  artifacts:
-    name: "bench_results"
-    when: always
-    paths:
-      - bench_results.json
+FINN Benchmark Suite:
+  stage: bench
+  rules:
+    - if: $MANUAL_CFG_PATH == ""
+  trigger:
+    include: benchmarking/bench-ci.yml
+  parallel:
+    matrix:
+      - BENCH_CFG: [mvau_test, transformer_test, transformer_sweep, transformer_radioml_all]
 
 #TODO: more control via (optional) variables
-#TODO: enable json config file input
 #TODO: move power measurement from polling-based script to its own job/runner
 #TODO: ensure a freshly initialized workdir on job/runner level (e.g. created directories seem to stay there)
 #TODO: (optionally) save ALL build artifacts/logs/temporary files to artifacts or PFS for debugging (maybe via Jacamar feature of setting individual persistent workdirs?)

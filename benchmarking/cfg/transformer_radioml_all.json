@@ -1,0 +1,27 @@
+[
+    {
+        "seed": [12],
+        "model_dir": ["/pc2/groups/hpc-prf-ekiapp/felix/ci_models/radioml_0"],
+        "dut_duplication": [1]
+    },
+    {
+        "seed": [12],
+        "model_dir": ["/pc2/groups/hpc-prf-ekiapp/felix/ci_models/radioml_a"],
+        "dut_duplication": [1]
+    },
+    {
+        "seed": [12],
+        "model_dir": ["/pc2/groups/hpc-prf-ekiapp/felix/ci_models/radioml_b"],
+        "dut_duplication": [1]
+    },
+    {
+        "seed": [12],
+        "model_dir": ["/pc2/groups/hpc-prf-ekiapp/felix/ci_models/radioml_c"],
+        "dut_duplication": [1]
+    },
+    {
+        "seed": [12],
+        "model_dir": ["/pc2/groups/hpc-prf-ekiapp/felix/ci_models/radioml_d"],
+        "dut_duplication": [1]
+    }
+]
