@@ -149,12 +149,12 @@ initial begin
         repeat(8) begin
             @(posedge ap_clk);
             if(axilite_ctrl_rvalid) begin
-                $display("[t=%0t] CHECKSUM = %0x", $time, axilite_ctrl_rdata);
+                $display("[t=%0t] CHECKSUM = %8x", $time, axilite_ctrl_rdata);
                 if(axilite_ctrl_rdata) begin
                     //$display("Nonzero checksum detected, stopping simulation");
                     //$finish;
-                    if(axilite_ctrl_rdata[31:24] == 2) begin
-                        $display("Frame number 3 detected, stopping simulation");
+                    if(axilite_ctrl_rdata[31:24] == 9) begin
+                        $display("Frame number 10 detected, stopping simulation");
                         $finish;
                     end
                 end
