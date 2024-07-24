@@ -132,8 +132,8 @@ def test_step_run_instrwrap_sim(model, cfg):
     # Prepare bash script
     bash_script = os.getcwd() + "/report_power.sh"
     with open(bash_script, "w") as script:
-        script.write("#!/bin/bash \n")
-        script.write("cd %s"%(sim_output_dir))
+        script.write("#!/bin/bash\n")
+        script.write("cd %s\n"%(sim_output_dir))
         script.write(f"vivado -mode batch -source make_instrwrap_sim_proj.tcl\n")
 
     # Run script
