@@ -100,3 +100,6 @@ MANIFEST
 # instrumentation wrapper configuration files
 !system.cfg
 !ila_0_bd.cfg
+
+# debug directories for benchmarking infrastructure
+benchmarking/debug*

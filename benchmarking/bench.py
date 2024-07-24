@@ -22,6 +22,7 @@ def main(config_name):
 
     # Gather job array info
     job_id = int(os.environ["SLURM_JOB_ID"])
+    #TODO: allow portable execution on any platform by making as many env vars as possible optional
     print("Job launched with ID: %d" % (job_id))
     try:
         array_id = int(os.environ["SLURM_ARRAY_JOB_ID"])
@@ -48,7 +49,11 @@ def main(config_name):
     
     # save dir for saving bitstreams (and optionally full build artifacts for debugging (TODO))
     # TODO: make this more configurable or switch to job/artifact based power measurement
-    save_dir = os.path.join("/scratch/hpc-prf-radioml/felix/jobs/",
+    if job_id == 0:
+        #DEBUG mode
+        save_dir = experiment_dir + "_save"
+    else:
+        save_dir = os.path.join("/scratch/hpc-prf-radioml/felix/jobs/",
                             "CI_" + os.environ.get("CI_PIPELINE_IID") + "_" + os.environ.get("CI_PIPELINE_NAME"))
     print("Saving additional artifacts in path: %s" % save_dir)
     os.makedirs(save_dir, exist_ok=True)
@@ -148,6 +153,7 @@ def main(config_name):
         with open(log_path, "w") as f:
             json.dump(log, f, indent=2)
     print("Stopping job")
+    #TODO: fail the pipeline if a run failed due to exception? or even if verification failed?
 
 if __name__ == "__main__":
     main(sys.argv[1])

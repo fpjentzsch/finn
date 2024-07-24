@@ -29,7 +29,7 @@
 
 module tb #(
 	// sampling period (in cycles) for reading instrumentation wrapper registers
-	int unsigned  INSTR_READ_PERIOD = 1000,
+	int unsigned  INSTR_READ_PERIOD = 10000,
     // 16-bit LFSR seed for generating fixed random data
     int unsigned LFSR_SEED = 1
 )();
@@ -151,8 +151,12 @@ initial begin
             if(axilite_ctrl_rvalid) begin
                 $display("[t=%0t] CHECKSUM = %0x", $time, axilite_ctrl_rdata);
                 if(axilite_ctrl_rdata) begin
-                    $display("Nonzero checksum detected, stopping simulation");
-                    $finish;
+                    //$display("Nonzero checksum detected, stopping simulation");
+                    //$finish;
+                    if(axilite_ctrl_rdata[31:24] == 2) begin
+                        $display("Frame number 3 detected, stopping simulation");
+                        $finish;
+                    end
                 end
                 break;
             end

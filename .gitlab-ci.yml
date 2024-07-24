@@ -50,6 +50,7 @@ Trigger Benchmark Suite:
     matrix:
       - BENCH_CFG: [mvau_test, transformer_test, transformer_sweep, transformer_radioml_all]
 
+#TODO: introduce result collect job on parent level for easier visualization/excel interfacing
 #TODO: more control via (optional) variables
 #TODO: move power measurement from polling-based script to its own job/runner
 #TODO: ensure a freshly initialized workdir on job/runner level (e.g. created directories seem to stay there)

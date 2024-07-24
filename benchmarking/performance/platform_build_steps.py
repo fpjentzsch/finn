@@ -15,6 +15,8 @@ from finn.util.hls import CallHLS
 from finn.transformation.fpgadataflow.insert_tlastmarker import InsertTLastMarker
 from finn.transformation.fpgadataflow.hlssynth_ip import HLSSynthIP
 from finn.transformation.fpgadataflow.prepare_ip import PrepareIP
+from finn.util.basic import pynq_part_map
+from finn.transformation.fpgadataflow.make_zynq_proj import collect_ip_dirs
 
 # Steps for generating instrumentation wrapper XO kernel file
 # and testbench simulation
@@ -55,7 +57,7 @@ def test_step_gen_instrumentation_wrapper(model, cfg):
     to = "ap_uint<%d>" % out_stream_width
     ko = out_shape_folded[-1]
     # fill out instrumentation wrapper template
-    with open("templates/instrumentation_wrapper.template.cpp", "r") as f:
+    with open(os.path.join(os.environ["FINN_ROOT"], "benchmarking/performance", "templates/instrumentation_wrapper.template.cpp"), "r") as f:
         instrwrp_cpp = f.read()
     instrwrp_cpp = instrwrp_cpp.replace("@PENDING@", str(pending))
     instrwrp_cpp = instrwrp_cpp.replace("@ILEN@", str(ilen))
@@ -101,16 +103,43 @@ def test_step_gen_instrwrap_sim(model, cfg):
     sim_output_dir = cfg.output_dir + "/instrwrap_sim"
     os.makedirs(sim_output_dir, exist_ok=True)
     # fill in testbench template
-    with open("templates/instrwrap_testbench.template.sv", "r") as f:
+    with open(os.path.join(os.environ["FINN_ROOT"], "benchmarking/performance", "templates/instrwrap_testbench.template.sv"), "r") as f:
         testbench_sv = f.read()
     with open(sim_output_dir + "/instrwrap_testbench.sv", "w") as f:
         f.write(testbench_sv)
     # fill in testbench project creator template
-    with open("templates/make_instrwrap_sim_proj.template.tcl", "r") as f:
+    with open(os.path.join(os.environ["FINN_ROOT"], "benchmarking/performance", "templates/make_instrwrap_sim_proj.template.tcl"), "r") as f:
         testbench_tcl = f.read()
-    testbench_tcl = testbench_tcl.replace("@FPGA_PART@", cfg.fpga_part)
+    if cfg.fpga_part is None:
+        # try looking it up
+        part = pynq_part_map[cfg.board]
+    else:
+        part = cfg.fpga_part
+    # collect ip repo paths for finn accelerator sub cores so Vivado can find them
+    ipstitch_path = model.get_metadata_prop("vivado_stitch_proj")
+    ip_dirs = ["list"]
+    ip_dirs += collect_ip_dirs(model, ipstitch_path)
+    ip_dirs_str = "[%s]" % (" ".join(ip_dirs))
+    testbench_tcl = testbench_tcl.replace("@FPGA_PART@", part)
+    testbench_tcl = testbench_tcl.replace("@IP_DIRS_STR@", ip_dirs_str)
     with open(sim_output_dir + "/make_instrwrap_sim_proj.tcl", "w") as f:
         f.write(testbench_tcl)
+    return model
+
+def test_step_run_instrwrap_sim(model, cfg):
+    sim_output_dir = cfg.output_dir + "/instrwrap_sim"
+
+    # Prepare bash script
+    bash_script = os.getcwd() + "/report_power.sh"
+    with open(bash_script, "w") as script:
+        script.write("#!/bin/bash \n")
+        script.write("cd %s"%(sim_output_dir))
+        script.write(f"vivado -mode batch -source make_instrwrap_sim_proj.tcl\n")
+
+    # Run script
+    print("Running Vivado simulation of instrumentation wrapper")
+    sub_proc = subprocess.Popen(["bash", bash_script])
+    sub_proc.communicate()
     return model
 
 def test_step_insert_tlastmarker(model, cfg):
@@ -140,13 +169,13 @@ def test_step_insert_tlastmarker(model, cfg):
 # into FINN compiler build
 def test_step_export_xo(model, cfg):
     # Copy the generated .xo files to their respective Vitis IP directory
-    result = subprocess.call(['cp', cfg.output_dir+"/xo/finn_design.xo", 'instr_wrap_platform/vitis/ip/finn_design/src'])
-    result = subprocess.call(['cp', cfg.output_dir+"/xo/instrumentation_wrapper.xo", 'instr_wrap_platform/vitis/ip/instrumentation_wrapper/src'])
+    result = subprocess.call(['cp', cfg.output_dir+"/xo/finn_design.xo", os.path.join(os.environ["FINN_ROOT"], "benchmarking/performance", "instr_wrap_platform/vitis/ip/finn_design/src")])
+    result = subprocess.call(['cp', cfg.output_dir+"/xo/instrumentation_wrapper.xo", os.path.join(os.environ["FINN_ROOT"], "benchmarking/performance", "instr_wrap_platform/vitis/ip/instrumentation_wrapper/src")])
     return model
 
 
 def test_step_build_platform(model, cfg):
     # Clean any previous/partial builds and then build full platform
-    result = subprocess.call("cd instr_wrap_platform && make clean && make all", shell=True)
+    result = subprocess.call("cd %s && make clean && make all"%(os.path.join(os.environ["FINN_ROOT"], "benchmarking/performance", "instr_wrap_platform")), shell=True)
     return model
 

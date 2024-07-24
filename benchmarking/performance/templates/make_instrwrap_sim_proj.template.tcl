@@ -31,12 +31,13 @@ set output_root ".."
 # path to IP folder for instrumentation wrapper, change as needed
 set instrwrp_ip_dir "$output_root/instrumentation_wrapper/project_instrwrap/sol1/impl/ip"
 # path to IP folder for FINN IP, change as needed
-set finn_ip_dir "$output_root/stitched_ip/ip"
+#set finn_ip_dir "$output_root/stitched_ip/ip"
 
 create_project -force instr_sim_proj instr_sim_proj/ -part $fpga_part
 create_bd_design "dut"
 update_compile_order -fileset sources_1
-set_property  ip_repo_paths  [list $instrwrp_ip_dir $finn_ip_dir] [current_project]
+set_property ip_repo_paths [list $instrwrp_ip_dir] [current_project]
+set_property ip_repo_paths [concat [get_property ip_repo_paths [current_project]] @IP_DIRS_STR@] [current_project]
 update_ip_catalog
 
 

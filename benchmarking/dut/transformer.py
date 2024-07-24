@@ -43,6 +43,15 @@ from dut.transformer_custom_steps import (
     node_by_node_rtlsim,
     node_by_node_cppsim
 )
+from performance.platform_build_steps import(
+     test_step_gen_vitis_xo,
+     test_step_gen_instrumentation_wrapper,
+     test_step_gen_instrwrap_sim,
+     test_step_insert_tlastmarker,
+     test_step_export_xo,
+     test_step_build_platform,
+     test_step_run_instrwrap_sim
+)
 
 ### ADAPTED FROM utils.py
 # Seeds all relevant random number generators to the same seed for
@@ -879,7 +888,8 @@ class bench_transformer(bench):
             mvau_wwidth_max = 2048,
             split_large_fifos = True,
 
-            verbose=False, # if True prints stdout and stderr to console instead of build_dataflow.log
+            verbose = False, # if True prints stdout and stderr to console instead of build_dataflow.log
+            enable_build_pdb_debug = False,
 
             generate_outputs=[
                 build_cfg.DataflowOutputType.ESTIMATE_REPORTS,
@@ -983,16 +993,23 @@ class bench_transformer(bench):
                 # Only for debugging for now, does not work if "vivado" style
                 # StreamingFIFOs are used
                 # node_by_node_rtlsim,
+                test_step_insert_tlastmarker,
                 "step_create_stitched_ip",
                 # Attention does currently not support RTL simulation due to missing
                 # float IPs.
                 # "step_measure_rtlsim_performance",
                 # Insert custom step instead of usual Shell build:
-                step_synth_harness,
+                #step_synth_harness, #DEBUG: replace with instrumentation wrapper steps
                 "step_out_of_context_synthesis",
                 "step_synthesize_bitfile",
                 "step_make_pynq_driver",
                 "step_deployment_package",
+                test_step_gen_vitis_xo,
+                test_step_gen_instrumentation_wrapper,
+                test_step_gen_instrwrap_sim,
+                test_step_run_instrwrap_sim,
+                #test_step_export_xo,
+                #test_step_build_platform
             ]
         )
         # Run the build process on the dummy attention operator graph

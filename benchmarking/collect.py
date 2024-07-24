@@ -80,10 +80,10 @@ if __name__ == "__main__":
 
     wait_for_power_measurements()
 
-    print("Merging power measurement logs with remaining logs")
-    #TODO: do not fail if there was no bitstream to measure
     power_log_path = os.path.join("/mnt/pfs/hpc-prf-radioml/felix/jobs/", 
                             "CI_" + os.environ.get("CI_PIPELINE_IID") + "_" + os.environ.get("CI_PIPELINE_NAME"), 
                             "power_measure.json")
-    merge_logs(sys.argv[2], power_log_path, sys.argv[2])
+    if os.path.isfile(power_log_path):
+        print("Merging power measurement logs with remaining logs")
+        merge_logs(sys.argv[2], power_log_path, sys.argv[2])
     print("Done")
