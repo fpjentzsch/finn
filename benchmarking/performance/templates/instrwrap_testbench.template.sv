@@ -153,8 +153,8 @@ initial begin
                 if(axilite_ctrl_rdata) begin
                     //$display("Nonzero checksum detected, stopping simulation");
                     //$finish;
-                    if(axilite_ctrl_rdata[31:24] == 9) begin
-                        $display("Frame number 10 detected, stopping simulation");
+                    if(axilite_ctrl_rdata[31:24] == 47) begin
+                        $display("Frame number 48 detected, stopping simulation");
                         $finish;
                     end
                 end
