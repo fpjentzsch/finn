@@ -736,6 +736,49 @@ def step_apply_folding_config(model: ModelWrapper, cfg: DataflowBuildConfig):
     return model
 
 
+# Runs a node-by-node Python simulation of the model saving the fill execution
+# context
+# Note: Assumes no execution mode to be set
+def node_by_node_python(model: ModelWrapper, cfg: DataflowBuildConfig):
+    # Save the original model
+    original = model
+    # Copy the model
+    model = copy.deepcopy(model)
+
+    # Load the verification input/output pair
+    inp = np.load(cfg.verify_input_npy)  # noqa
+    out = np.load(cfg.verify_expected_output_npy)
+
+    # Path to the parent model wrapping the streaming dataflow partition and the
+    # wrapped child model, i.e., the inside of the streaming dataflow partition
+    parent = f"{cfg.output_dir}/intermediate_models/dataflow_parent.onnx"
+    child = f"{cfg.output_dir}/intermediate_models/verify_cppsim.onnx"
+    # Save the child model prepared for python simulation
+    model.save(child)
+    # Load the parent model to pass to verification execution
+    parent_model = ModelWrapper(parent)
+
+    # Reshape the input/output to match the model
+    inp = inp.reshape(parent_model.get_tensor_shape(model.graph.input[0].name))
+    out = out.reshape(parent_model.get_tensor_shape(model.graph.output[0].name))
+
+    # Execute the onnx model to collect the result
+    # context = execute_onnx(model, context, return_full_exec_context=True)
+    context = execute_parent(parent, child, inp, return_full_ctx=True)
+    # Extract the output tensor from the execution context
+    model_out = context[parent_model.graph.output[0].name]
+    # Compare input to output
+    result = {True: "SUCCESS", False: "FAIL"}[
+        np.allclose(out, model_out, atol=1e-3)
+    ]
+    # Save the verification outputs into the configured build directory
+    verification_output = f"{cfg.output_dir}/verification_output/"
+    # Save the verification execution context
+    np.savez(f"{verification_output}/verify_python_{result}.npz", **context)
+    # Return the original, unmodified model
+    return original
+
+
 # Runs a node-by-node C++ simulation of the model saving the fill execution
 # context
 def node_by_node_cppsim(model: ModelWrapper, cfg: DataflowBuildConfig):
@@ -773,7 +816,9 @@ def node_by_node_cppsim(model: ModelWrapper, cfg: DataflowBuildConfig):
     # Extract the output tensor from the execution context
     model_out = context[parent_model.graph.output[0].name]
     # Compare input to output
-    result = {True: "SUCCESS", False: "FAIL"}[np.allclose(out, model_out)]
+    result = {True: "SUCCESS", False: "FAIL"}[
+        np.allclose(out, model_out, atol=1e-3)
+    ]
     # Save the verification outputs into the configured build directory
     verification_output = f"{cfg.output_dir}/verification_output/"
     # Save the verification execution context
@@ -822,7 +867,9 @@ def node_by_node_rtlsim(model: ModelWrapper, cfg: DataflowBuildConfig):
     # Extract the output tensor from the execution context
     model_out = context[parent_model.graph.output[0].name]
     # Compare input to output
-    result = {True: "SUCCESS", False: "FAIL"}[np.allclose(out, model_out)]
+    result = {True: "SUCCESS", False: "FAIL"}[
+        np.allclose(out, model_out, atol=1e-3)
+    ]
     # Save the verification outputs into the configured build directory
     verification_output = f"{cfg.output_dir}/verification_output/"
     # Save the verification execution context

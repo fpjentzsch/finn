@@ -15,7 +15,7 @@ from finn.util.hls import CallHLS
 from finn.transformation.fpgadataflow.insert_tlastmarker import InsertTLastMarker
 from finn.transformation.fpgadataflow.hlssynth_ip import HLSSynthIP
 from finn.transformation.fpgadataflow.prepare_ip import PrepareIP
-from finn.util.basic import pynq_part_map
+from finn.util.basic import pynq_part_map, alveo_part_map
 from finn.transformation.fpgadataflow.make_zynq_proj import collect_ip_dirs
 
 # Steps for generating instrumentation wrapper XO kernel file
@@ -112,7 +112,12 @@ def test_step_gen_instrwrap_sim(model, cfg):
         testbench_tcl = f.read()
     if cfg.fpga_part is None:
         # try looking it up
-        part = pynq_part_map[cfg.board]
+        if cfg.board in pynq_part_map:
+            part = pynq_part_map[cfg.board]
+        elif cfg.board in alveo_part_map:
+            part = alveo_part_map[cfg.board]
+        else:
+            print("ERROR, no part or known board defined")
     else:
         part = cfg.fpga_part
     # collect ip repo paths for finn accelerator sub cores so Vivado can find them

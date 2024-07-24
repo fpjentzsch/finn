@@ -1,0 +1,7 @@
+[
+    {
+        "seed": [12],
+        "model_dir": ["/pc2/groups/hpc-prf-ekiapp/felix/ci_models/gpt_d"],
+        "dut_duplication": [1]
+    }
+]
