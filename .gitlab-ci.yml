@@ -16,7 +16,7 @@ variables:
     value: "8"
   SLURM_TIMEOUT:
     description: "Timeout"
-    value: "0-12" # [days-hours]
+    value: "2-0" # [days-hours]
   MANUAL_CFG_PATH:
     description: "Use this config file instead of configs stored in the repo. Path must be accessible to runner"
     value: ""

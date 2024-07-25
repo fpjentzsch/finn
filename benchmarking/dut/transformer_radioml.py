@@ -18,7 +18,7 @@ import numpy as np
 from brevitas.export import export_qonnx
 import random
 import json
-
+import subprocess
 # FINN dataflow builder
 import finn.builder.build_dataflow as build
 import finn.builder.build_dataflow_config as build_cfg
@@ -316,7 +316,7 @@ class bench_transformer_radioml(bench):
                 test_step_gen_vitis_xo,
                 test_step_gen_instrumentation_wrapper,
                 test_step_gen_instrwrap_sim,
-                test_step_run_instrwrap_sim,
+                #test_step_run_instrwrap_sim, # MOVED to after build flow due to extreme runtime
                 #test_step_export_xo,
                 #test_step_build_platform
             ]
@@ -348,6 +348,20 @@ class bench_transformer_radioml(bench):
             self.save_local_artifact("finn_cwd", os.path.join(os.environ["PATH_WORKDIR"], "finn"))
             #TODO: save as early as possible or regardless of errors
 
+        #DEBUG:
+        live_log_dir_path = os.path.join(self.save_dir, "vivado_sim_log", "run_%d" % (self.run_id), "vivado.log")
+        sim_output_dir = build_dir + "/instrwrap_sim"
+        # Prepare bash script
+        bash_script = os.getcwd() + "/run_vivado_sim.sh"
+        with open(bash_script, "w") as script:
+            script.write("#!/bin/bash\n")
+            script.write("cd %s\n"%(sim_output_dir))
+            script.write("vivado -mode batch -source make_instrwrap_sim_proj.tcl &> %s\n"%(live_log_dir_path))
+        # Run script
+        print("Running Vivado simulation of instrumentation wrapper")
+        sub_proc = subprocess.Popen(["bash", bash_script])
+        sub_proc.communicate()
+        ######
         self.step_parse_builder_output(build_dir)
 
         return self.output_dict
