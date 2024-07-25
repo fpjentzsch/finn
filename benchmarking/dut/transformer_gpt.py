@@ -362,6 +362,7 @@ class bench_transformer_gpt(bench):
 
         #DEBUG:
         live_log_dir_path = os.path.join(self.save_dir, "vivado_sim_log", "run_%d" % (self.run_id), "vivado.log")
+        os.makedirs(os.path.join(self.save_dir, "vivado_sim_log", "run_%d" % (self.run_id)), exist_ok=True)
         sim_output_dir = build_dir + "/instrwrap_sim"
         # Prepare bash script
         bash_script = os.getcwd() + "/run_vivado_sim.sh"
