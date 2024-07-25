@@ -879,7 +879,7 @@ class bench_transformer(bench):
             # Unpack the build configuration parameters
             #**params["build"],
             output_dir = output_dir,
-            stitched_ip_gen_dcp = False,
+            stitched_ip_gen_dcp = True,
             synth_clk_period_ns = self.clock_period_ns,
             board = self.board,
             shell_flow_type = "vivado_zynq", #TODO: Alveo support
