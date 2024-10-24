@@ -102,6 +102,7 @@ SCRIPTPATH=$(dirname "$SCRIPT")
 : ${FINN_SINGULARITY=""}
 : ${FINN_SKIP_XRT_DOWNLOAD=""}
 : ${FINN_XRT_PATH=""}
+: ${FINN_DOCKER_NO_CACHE="0"}
 
 DOCKER_INTERACTIVE=""
 
@@ -142,7 +143,7 @@ elif [ "$1" = "build_custom" ]; then
   DOCKER_INTERACTIVE="-it"
   #FINN_HOST_BUILD_DIR=$BUILD_DATAFLOW_DIR/build
   gecho "Running build_custom: $BUILD_CUSTOM_DIR/$FLOW_NAME.py"
-  DOCKER_CMD="python -mpdb -cc -cq $FLOW_NAME.py"
+  DOCKER_CMD="python -mpdb -cc -cq $FLOW_NAME.py ${@:4}"
 elif [ -z "$1" ]; then
    gecho "Running container only"
    DOCKER_CMD="bash"
@@ -188,6 +189,10 @@ fi
 if [ -d "$FINN_XRT_PATH" ];then
   cp $FINN_XRT_PATH/$XRT_DEB_VERSION.deb .
   export LOCAL_XRT=1
+fi
+
+if [ "$FINN_DOCKER_NO_CACHE" = "1" ]; then
+  FINN_DOCKER_BUILD_EXTRA+="--no-cache "
 fi
 
 # Build the FINN Docker image
