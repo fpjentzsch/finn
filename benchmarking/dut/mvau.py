@@ -293,4 +293,3 @@ class bench_mvau(bench):
 
     def run(self):
         self.steps_simple_model_flow()
-        return self.output_dict

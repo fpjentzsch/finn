@@ -1010,8 +1010,8 @@ class bench_transformer(bench):
                 test_step_gen_instrumentation_wrapper,
                 test_step_gen_instrwrap_sim,
                 #test_step_run_instrwrap_sim, # MOVED to after build flow due to extreme runtime
-                #test_step_export_xo,
-                #test_step_build_platform
+                test_step_export_xo,
+                test_step_build_platform
             ]
         )
         # Run the build process on the dummy attention operator graph
@@ -1019,44 +1019,42 @@ class bench_transformer(bench):
         build.build_dataflow_cfg(input_onnx_path, cfg)
 
     def run(self):
-        #self.steps_full_build_flow()
-        #DEBUG
+        self.steps_full_build_flow()
+        # #DEBUG
 
-        # Use a temporary dir for buildflow-related files (next to FINN_BUILD_DIR)
-        # Ensure it exists but is empty (clear potential artifacts from previous runs)
-        tmp_buildflow_dir = os.path.join(os.environ["PATH_WORKDIR"], "buildflow")
-        os.makedirs(tmp_buildflow_dir, exist_ok=True)
-        delete_dir_contents(tmp_buildflow_dir)
-        onnx_export_path = os.path.join(tmp_buildflow_dir, "model_export.onnx")
-        build_dir = os.path.join(tmp_buildflow_dir, "build_output")
+        # # Use a temporary dir for buildflow-related files (next to FINN_BUILD_DIR)
+        # # Ensure it exists but is empty (clear potential artifacts from previous runs)
+        # tmp_buildflow_dir = os.path.join(os.environ["PATH_WORKDIR"], "buildflow")
+        # os.makedirs(tmp_buildflow_dir, exist_ok=True)
+        # delete_dir_contents(tmp_buildflow_dir)
+        # onnx_export_path = os.path.join(tmp_buildflow_dir, "model_export.onnx")
+        # build_dir = os.path.join(tmp_buildflow_dir, "build_output")
 
-        self.step_export_onnx(onnx_export_path)
-        self.save_local_artifact("model_step_export", onnx_export_path)
+        # self.step_export_onnx(onnx_export_path)
+        # self.save_local_artifact("model_step_export", onnx_export_path)
 
-        self.step_build(onnx_export_path, build_dir)
-        self.save_local_artifact("build_output", build_dir)
-        if self.debug:
-            # Save entire FINN tmp build dir for debugging
-            self.save_local_artifact("finn_tmp", os.environ["FINN_BUILD_DIR"])
-            self.save_local_artifact("finn_cwd", os.path.join(os.environ["PATH_WORKDIR"], "finn"))
-            #TODO: save as early as possible or regardless of errors
+        # self.step_build(onnx_export_path, build_dir)
+        # self.save_local_artifact("build_output", build_dir)
+        # if self.debug:
+        #     # Save entire FINN tmp build dir for debugging
+        #     self.save_local_artifact("finn_tmp", os.environ["FINN_BUILD_DIR"])
+        #     self.save_local_artifact("finn_cwd", os.path.join(os.environ["PATH_WORKDIR"], "finn"))
+        #     #TODO: save as early as possible or regardless of errors
 
-        #DEBUG:
-        live_log_dir_path = os.path.join(self.save_dir, "vivado_sim_log", "run_%d" % (self.run_id), "vivado.log")
-        os.makedirs(os.path.join(self.save_dir, "vivado_sim_log", "run_%d" % (self.run_id)), exist_ok=True)
-        sim_output_dir = build_dir + "/instrwrap_sim"
-        # Prepare bash script
-        bash_script = os.getcwd() + "/run_vivado_sim.sh"
-        with open(bash_script, "w") as script:
-            script.write("#!/bin/bash\n")
-            script.write("cd %s\n"%(sim_output_dir))
-            script.write("vivado -mode batch -source make_instrwrap_sim_proj.tcl &> %s\n"%(live_log_dir_path))
-        # Run script
-        print("Running Vivado simulation of instrumentation wrapper")
-        sub_proc = subprocess.Popen(["bash", bash_script])
-        sub_proc.communicate()
-        ######
+        # #DEBUG:
+        # live_log_dir_path = os.path.join(self.save_dir, "vivado_sim_log", "run_%d" % (self.run_id), "vivado.log")
+        # os.makedirs(os.path.join(self.save_dir, "vivado_sim_log", "run_%d" % (self.run_id)), exist_ok=True)
+        # sim_output_dir = build_dir + "/instrwrap_sim"
+        # # Prepare bash script
+        # bash_script = os.getcwd() + "/run_vivado_sim.sh"
+        # with open(bash_script, "w") as script:
+        #     script.write("#!/bin/bash\n")
+        #     script.write("cd %s\n"%(sim_output_dir))
+        #     script.write("vivado -mode batch -source make_instrwrap_sim_proj.tcl &> %s\n"%(live_log_dir_path))
+        # # Run script
+        # print("Running Vivado simulation of instrumentation wrapper")
+        # sub_proc = subprocess.Popen(["bash", bash_script])
+        # sub_proc.communicate()
+        # ######
 
-        self.step_parse_builder_output(build_dir)
-
-        return self.output_dict
+        # self.step_parse_builder_output(build_dir)
