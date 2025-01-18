@@ -111,6 +111,7 @@ def main(config_name):
     # Run benchmark
     # TODO: integrate this loop (especially status logging) into the bench class
     # TODO: log additional info as artifact or directly into info section of json (e.g. dut, versions, date)
+    # TODO: log stdout of individual tasks of the job array into seperate files as artifacts (GitLab web interface is not readable)
     log = []
     for run, run_id in enumerate(selected_runs):
         print(

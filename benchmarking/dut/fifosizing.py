@@ -347,6 +347,8 @@ class bench_fifosizing(bench):
             node_inst = getCustomOp(node)
             log["fifo_sizes"][node.name] = node_inst.get_nodeattr("depth")
 
+        #TODO: log total FIFO sizes (in Bytes)
+
         # reduce individual FIFO sizes by some amount and observe throughput drop or deadlock appear
         fifo_reduction_pass = []
         log["fifo_reduction_results"] = {}
