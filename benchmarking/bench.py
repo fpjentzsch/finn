@@ -13,6 +13,7 @@ from dut.transformer_gpt import bench_transformer_gpt
 from dut.fifosizing import bench_fifosizing
 
 def main(config_name):
+    exit_code = 0
     # Attempt to work around onnxruntime issue on Slurm-managed clusters:
     # See https://github.com/microsoft/onnxruntime/issues/8313
     _default_session_options = ort.capi._pybind_state.get_default_session_options()
@@ -151,6 +152,7 @@ def main(config_name):
             output_dict = {}
             log_dict["status"] = "failed"
             print("Run failed: " + traceback.format_exc())
+            exit_code = 1
 
         log_dict["total_time"] = int(time.time() - start_time)
         log_dict["output"] = output_dict
@@ -160,7 +162,9 @@ def main(config_name):
         with open(log_path, "w") as f:
             json.dump(log, f, indent=2)
     print("Stopping job")
-    #TODO: fail the pipeline if a run failed due to exception? or even if verification failed?
+    return exit_code
+    #TODO: add additional exit codes (e.g. when some verification within the run failed)?
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    exit_code = main(sys.argv[1])
+    sys.exit(exit_code)

@@ -877,13 +877,23 @@ class bench():
         tmp_buildflow_dir = os.path.join(os.environ["PATH_WORKDIR"], "buildflow")
         os.makedirs(tmp_buildflow_dir, exist_ok=True)
         delete_dir_contents(tmp_buildflow_dir)
-        onnx_export_path = os.path.join(tmp_buildflow_dir, "model_export.onnx")
         build_dir = os.path.join(tmp_buildflow_dir, "build_output")
 
-        self.step_export_onnx(onnx_export_path)
-        self.save_local_artifact("model_step_export", onnx_export_path)
+        if "model_dir" in self.params:
+            # input ONNX model and verification input/output pairs are provided
+            model_dir = self.params["model_dir"]
+            onnx_path = os.path.join(model_dir, "model.onnx")
+            input_npy_path = os.path.join(model_dir, "inp.npy")
+            output_npy_path = os.path.join(model_dir, "out.npy")
+        else:
+            # input ONNX model will be generated
+            onnx_path = os.path.join(tmp_buildflow_dir, "model_export.onnx")
+            input_npy_path = None # TODO: generate golden input/output pair for verification
+            output_npy_path = None
+            self.step_export_onnx(onnx_path)
+            self.save_local_artifact("model_step_export", onnx_path)
 
-        self.step_build(onnx_export_path, build_dir)
+        self.step_build(onnx_path, input_npy_path, output_npy_path, build_dir)
         self.save_local_artifact("build_output", build_dir)
         if self.debug:
             # Save entire FINN tmp build dir for debugging
