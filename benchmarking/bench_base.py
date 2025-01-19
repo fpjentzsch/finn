@@ -750,6 +750,7 @@ class bench():
         model = model.transform(CreateStitchedIP(self.part, self.clock_period_ns))
 
         build_dir = "temp_output_harness_build"
+        # TODO: replace hold harness with new instr wrapper implementation
         #TODO: if synth fails this could contain stale bitstreams which will be power tested
         model = model.transform(
             MakeZYNQHarnessProject(
@@ -784,7 +785,8 @@ class bench():
 
         # COPY bitstreams and other outputs
         # TODO: integrate better (e.g. as artifact) and remove redundant copy
-        # TODO: make this more configurable or switch to job/artifact based power measurement 
+        # TODO: make this more configurable or switch to job/artifact based power measurement
+        # TODO: make compatible to new instr wrapper (or however we generate these outputs)
         shcopy(os.path.join(build_dir, "harness/top_wrapper.bit"), 
                os.path.join(self.save_dir_bitstreams, "run_%d.bit" % self.run_id))
         shcopy(os.path.join(build_dir, "harness/top.hwh"), 

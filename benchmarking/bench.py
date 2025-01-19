@@ -16,6 +16,8 @@ def main(config_name):
     exit_code = 0
     # Attempt to work around onnxruntime issue on Slurm-managed clusters:
     # See https://github.com/microsoft/onnxruntime/issues/8313
+    # This seems to happen only when assigned CPU cores are not contiguous
+    # TODO: add this to test suite as well, errors were observed there too
     _default_session_options = ort.capi._pybind_state.get_default_session_options()
     def get_default_session_options_new():
         _default_session_options.inter_op_num_threads = 1

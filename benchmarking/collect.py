@@ -51,6 +51,7 @@ def merge_logs(log_a, log_b, log_out):
         json.dump(out, f, indent=2)
 
 def wait_for_power_measurements():
+    # TODO: detect when no bitstreams are to be measured (e.g. for fifosizing) and skip
     # TODO: make configurable, relative to some env variable due to different mountint points
     bitstreams_path = os.path.join("/mnt/pfs/hpc-prf-radioml/felix/jobs/", 
                             "CI_" + os.environ.get("CI_PIPELINE_IID") + "_" + os.environ.get("CI_PIPELINE_NAME"), 
@@ -78,12 +79,12 @@ if __name__ == "__main__":
     print("Consolidating synthesis results from all sub-jobs of the array")
     consolidate_logs(sys.argv[1], sys.argv[2])
 
-    wait_for_power_measurements()
-
-    power_log_path = os.path.join("/mnt/pfs/hpc-prf-radioml/felix/jobs/", 
-                            "CI_" + os.environ.get("CI_PIPELINE_IID") + "_" + os.environ.get("CI_PIPELINE_NAME"), 
-                            "power_measure.json")
-    if os.path.isfile(power_log_path):
-        print("Merging power measurement logs with remaining logs")
-        merge_logs(sys.argv[2], power_log_path, sys.argv[2])
+    # TODO: disabled for now, update accordingly to new runner-based measurement setup
+    # wait_for_power_measurements()
+    # power_log_path = os.path.join("/mnt/pfs/hpc-prf-radioml/felix/jobs/", 
+    #                         "CI_" + os.environ.get("CI_PIPELINE_IID") + "_" + os.environ.get("CI_PIPELINE_NAME"), 
+    #                         "power_measure.json")
+    # if os.path.isfile(power_log_path):
+    #     print("Merging power measurement logs with remaining logs")
+    #     merge_logs(sys.argv[2], power_log_path, sys.argv[2])
     print("Done")

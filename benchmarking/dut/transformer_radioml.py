@@ -309,14 +309,14 @@ class bench_transformer_radioml(bench):
 
                 # "step_measure_rtlsim_performance", # not possible due to float components
 
-                #step_synth_harness, #TODO: replace with instr wrapper (or port it into this step)
+                step_synth_harness, #TODO: replace with instr wrapper (or port it into this step)
                 
-                "step_out_of_context_synthesis", # for synthesis results (e.g. utilization)
+                #"step_out_of_context_synthesis", # for synthesis results (e.g. utilization)
 
                 # normal deployment TODO: replace with instr wrapper (or port it into this step as an option) 
-                "step_synthesize_bitfile", 
-                "step_make_pynq_driver",
-                "step_deployment_package",
+                #"step_synthesize_bitfile", 
+                #"step_make_pynq_driver",
+                #"step_deployment_package",
 
                 #test_step_gen_vitis_xo, # preparation step for original instr wrapper integration
                 #test_step_gen_instrumentation_wrapper, # preparation step for original instr wrapper integration

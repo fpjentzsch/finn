@@ -33,6 +33,7 @@ Trigger Manual Benchmark:
     - if: $MANUAL_CFG_PATH != ""
   trigger:
     include: benchmarking/bench-ci.yml
+    strategy: depend
     forward:
       pipeline_variables: true
   variables:
@@ -44,6 +45,7 @@ Trigger Benchmark Suite:
     - if: $MANUAL_CFG_PATH == ""
   trigger:
     include: benchmarking/bench-ci.yml
+    strategy: depend
     forward:
       pipeline_variables: true
   parallel:
