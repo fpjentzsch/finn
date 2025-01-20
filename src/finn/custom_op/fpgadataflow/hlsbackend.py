@@ -105,6 +105,17 @@ class HLSBackend(ABC):
             verilog_path=[single_src_dir],
             trace_depth=get_rtlsim_trace_depth(),
             top_module_name=self.get_verilog_top_module_name(),
+            extra_args=["-Wno-STMTDLY",
+                        "-Wno-PINMISSING",
+                        "-Wno-IMPLICIT",
+                        "-Wno-WIDTH",
+                        "-Wno-COMBDLY",
+                        "-Wno-WIDTHCONCAT",
+                        "-Wno-UNPACKED",
+                        "-Wno-TIMESCALEMOD",
+                        "-Wno-MODDUP",
+                        "-Wno-CASEINCOMPLETE",
+                        ]
         )
         # save generated lib filename in attribute
         self.set_nodeattr("rtlsim_so", sim.lib._name)

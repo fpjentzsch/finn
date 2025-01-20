@@ -187,6 +187,11 @@ def verilator_fifosim(model, n_inputs, max_iters=100000000):
     xpm_args.append("-Wno-IMPLICIT")
     xpm_args.append("-Wno-WIDTH")
     xpm_args.append("-Wno-COMBDLY")
+    xpm_args.append("-Wno-WIDTHCONCAT")
+    xpm_args.append("-Wno-UNPACKED")
+    xpm_args.append("-Wno-TIMESCALEMOD")
+    xpm_args.append("-Wno-MODDUP")
+    xpm_args.append("-Wno-CASEINCOMPLETE")
     vivado_path = os.environ["VIVADO_PATH"]
     # additional SystemVerilog modules to make XPMs work with Verilator
     xpm_memory = f"{vivado_path}/data/ip/xpm/xpm_memory/hdl/xpm_memory.sv"
@@ -298,6 +303,11 @@ def pyverilate_stitched_ip(
         verilator_args += ["-Wno-IMPLICIT"]
         verilator_args += ["-Wno-WIDTH"]
         verilator_args += ["-Wno-COMBDLY"]
+        verilator_args += ["-Wno-WIDTHCONCAT"]
+        verilator_args += ["-Wno-UNPACKED"]
+        verilator_args += ["-Wno-TIMESCALEMOD"]
+        verilator_args += ["-Wno-MODDUP"]
+        verilator_args += ["-Wno-CASEINCOMPLETE"]
     # force inlining of all submodules to ensure we can read internal signals properly
     if read_internal_signals:
         verilator_args += ["--inline-mult", "0"]

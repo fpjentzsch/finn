@@ -385,6 +385,17 @@ class Thresholding_rtl(Thresholding, RTLBackend):
             trace_depth=get_rtlsim_trace_depth(),
             top_module_name=self.get_nodeattr("gen_top_module"),
             auto_eval=False,
+            extra_args=["-Wno-STMTDLY",
+                        "-Wno-PINMISSING",
+                        "-Wno-IMPLICIT",
+                        "-Wno-WIDTH",
+                        "-Wno-COMBDLY",
+                        "-Wno-WIDTHCONCAT",
+                        "-Wno-UNPACKED",
+                        "-Wno-TIMESCALEMOD",
+                        "-Wno-MODDUP",
+                        "-Wno-CASEINCOMPLETE",
+                        ]
         )
 
         # save generated lib filename in attribute
