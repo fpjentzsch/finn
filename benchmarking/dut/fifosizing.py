@@ -342,12 +342,15 @@ class bench_fifosizing(bench):
         log["estimated_throughput"] = estimated_throughput
 
         # log FIFO sizes for easier inspection
+        log["fifo_depths"] = {}
         log["fifo_sizes"] = {}
+        total_fifo_size = 0
         for node in model_final.get_nodes_by_op_type("StreamingFIFO_rtl"):
             node_inst = getCustomOp(node)
-            log["fifo_sizes"][node.name] = node_inst.get_nodeattr("depth")
-
-        #TODO: log total FIFO sizes (in Bytes)
+            log["fifo_depths"][node.name] = node_inst.get_nodeattr("depth")
+            log["fifo_sizes"][node.name] = node_inst.get_instream_width() * node_inst.get_nodeattr("depth")
+            total_fifo_size += log["fifo_sizes"][node.name] 
+        log["total_fifo_size_kB"] = int(total_fifo_size / 8.0 / 1000.0)
 
         # reduce individual FIFO sizes by some amount and observe throughput drop or deadlock appear
         fifo_reduction_pass = []

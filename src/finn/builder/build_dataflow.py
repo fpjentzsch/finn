@@ -169,6 +169,9 @@ def build_dataflow_cfg(model_filename, cfg: DataflowBuildConfig):
                 model.save("%s/%s" % (intermediate_model_dir, chkpt_name))
             step_num += 1
         except:  # noqa
+            # log exception to logfile
+            # (workaround because restoring stdout/stderr doesn't seem to work in our CI)
+            traceback.print_exc(file=stderr_logger)
             # restore stdout/stderr
             sys.stdout = stdout_orig
             sys.stderr = stderr_orig
