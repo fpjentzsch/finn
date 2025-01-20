@@ -181,6 +181,12 @@ def verilator_fifosim(model, n_inputs, max_iters=100000000):
     xpm_args.append("-DOBSOLETE")
     xpm_args.append("-DONESPIN")
     xpm_args.append("--bbox-unsup")
+    # DEBUG: disable common warnings for this simulation too
+    xpm_args.append("-Wno-STMTDLY")
+    xpm_args.append("-Wno-PINMISSING")
+    xpm_args.append("-Wno-IMPLICIT")
+    xpm_args.append("-Wno-WIDTH")
+    xpm_args.append("-Wno-COMBDLY")
     vivado_path = os.environ["VIVADO_PATH"]
     # additional SystemVerilog modules to make XPMs work with Verilator
     xpm_memory = f"{vivado_path}/data/ip/xpm/xpm_memory/hdl/xpm_memory.sv"
