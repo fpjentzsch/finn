@@ -23,7 +23,7 @@ from finn.analysis.fpgadataflow.exp_cycles_per_layer import exp_cycles_per_layer
 from finn.analysis.fpgadataflow.hls_synth_res_estimation import hls_synth_res_estimation
 from finn.analysis.fpgadataflow.res_estimation import res_estimation
 from finn.transformation.fpgadataflow.make_zynq_proj import collect_ip_dirs
-from finn.util.basic import make_build_dir, pynq_native_port_width, pynq_part_map
+from finn.util.basic import make_build_dir, pynq_native_port_width, part_map
 from templates import template_open, template_single_test, template_sim_power, template_switching_simulation_tb, zynq_harness_template
 from util import summarize_table, summarize_section, power_xml_to_dict, prepare_inputs, delete_dir_contents
 from finn.transformation.fpgadataflow.replace_verilog_relpaths import (
@@ -397,7 +397,7 @@ class MakeZYNQHarnessProject(Transformation):
                     axilite_idx,
                     aximm_idx,
                     self.platform,
-                    pynq_part_map[self.platform],
+                    part_map[self.platform],
                     config,
                 )
             )

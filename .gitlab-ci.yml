@@ -23,6 +23,8 @@ variables:
   SLURM_QOS:
     description: "Optional QoS option (include --qos, e.g., --qos express)"
     value: ""
+  FINN_XILINX_VERSION:
+    value: "2022.2"
 
 workflow:
   name: '$PIPELINE_NAME'
@@ -50,7 +52,7 @@ Trigger Benchmark Suite:
       pipeline_variables: true
   parallel:
     matrix:
-      - BENCH_CFG: [mvau_test, fifosizing_test, transformer_test, transformer_sweep, transformer_radioml_all, transformer_gpt_all]
+      - BENCH_CFG: [mvau_test, fifosizing_test, transformer_test, transformer_radioml_all]
 
 #TODO: introduce result collect job on parent level for easier visualization/excel interfacing
 #TODO: more control via (optional) variables
