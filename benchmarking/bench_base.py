@@ -909,7 +909,7 @@ class bench():
         else:
             specialize_path = None
 
-        self.step_build(self, onnx_path, input_npy_path, output_npy_path, folding_path, specialize_path, build_dir)
+        self.step_build(onnx_path, input_npy_path, output_npy_path, folding_path, specialize_path, build_dir)
         self.save_local_artifact("build_output", build_dir)
         if self.debug:
             # Save entire FINN tmp build dir for debugging
