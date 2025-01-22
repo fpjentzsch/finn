@@ -244,7 +244,7 @@ def combine_blocks(lb, rb, ifm_dim, ch, pe):
     return model
 
 class bench_fifosizing(bench):
-    def step_make_model(self, onnx_export_path):
+    def step_export_onnx(self, onnx_export_path):
         np.random.seed(0)
         tmp_output_dir = make_build_dir("tmp_test_fifosizing")
 
@@ -283,12 +283,12 @@ class bench_fifosizing(bench):
         model = combine_blocks(lb, rb, dim, ch, pe=4)
         model.save(onnx_export_path)
 
+    def step_build_setup(self, build_dir):
+        # create build config for synthetic test models
 
-    def step_test_fifosizing(self, onnx_export_path, build_dir):
-        log = {}
-        cfg = build_cfg.DataflowBuildConfig(
+        build_cfg = build_cfg.DataflowBuildConfig(
             output_dir=build_dir,
-            verbose=True, # TODO: remove this?
+            verbose=False,
             # only works with characterization-based FIFO-sizing
             auto_fifo_depths=True,
             auto_fifo_strategy="characterize",
@@ -309,7 +309,11 @@ class bench_fifosizing(bench):
             ],
         )
 
-        build.build_dataflow_cfg(onnx_export_path, cfg)
+        return build_cfg
+    
+    def step_fifotest(self, onnx_path, build_cfg, build_dir):
+        log = {}
+        build.build_dataflow_cfg(onnx_path, build_cfg)
 
         # load performance reports
         with open(build_dir + "/report/estimate_network_performance.json") as f:
@@ -379,9 +383,9 @@ class bench_fifosizing(bench):
             model.save(tmp_output_dir_var + "/model.onnx")
 
             # build again, only re-run necessary steps to save time
-            cfg.output_dir = tmp_output_dir_var
-            cfg.steps = ["step_hw_codegen", "step_create_stitched_ip", "step_measure_rtlsim_performance"]
-            build.build_dataflow_cfg(tmp_output_dir_var + "/model.onnx", cfg)
+            build_cfg.output_dir = tmp_output_dir_var
+            build_cfg.steps = ["step_hw_codegen", "step_create_stitched_ip", "step_measure_rtlsim_performance"]
+            build.build_dataflow_cfg(tmp_output_dir_var + "/model.onnx", build_cfg)
 
             # load performance report
             with open(tmp_output_dir_var + "/report/rtlsim_performance.json") as f:
@@ -411,27 +415,102 @@ class bench_fifosizing(bench):
                 fifo_reduction_pass.append(False)
                 log["fifo_reduction_results"][node.name] = "fail (no drop)"
         
-        return log
+        self.output_dict["fifosizing_testresults"] = log
+
+    def step_build(self, onnx_export_path, input_npy_path, output_npy_path, folding_path, specialize_path, build_dir):
+        # TODO: rename steps to model three phases: model creation/import, dataflow build, analysis
+        # dataflow build should be easily swappable and adpaptable to finn-examples
+        # TODO: put more variables into (base) class instead of function parameters
+        build_cfg = self.step_build_setup(build_dir)
+        if folding_path is not None:
+            build_cfg.folding_config_file = folding_path
+        if specialize_path is not None:
+            build_cfg.specialize_layers_config_file = specialize_path
+        self.step_fifotest(onnx_export_path, build_cfg, build_dir)
+
+    def step_parse_builder_output(self, build_dir):
+        # build output itself is not relevant here (yet)
+        pass
 
     def run(self):
-        # TODO: similar behavior to Transformer DUTs, generalize..
-        # Use a temporary dir for buildflow-related files (next to FINN_BUILD_DIR)
-        # Ensure it exists but is empty (clear potential artifacts from previous runs)
-        tmp_buildflow_dir = os.path.join(os.environ["PATH_WORKDIR"], "buildflow")
-        os.makedirs(tmp_buildflow_dir, exist_ok=True)
-        delete_dir_contents(tmp_buildflow_dir)
-        onnx_export_path = os.path.join(tmp_buildflow_dir, "model_export.onnx")
-        build_dir = os.path.join(tmp_buildflow_dir, "build_output")
+        self.steps_full_build_flow()
 
-        self.step_make_model(onnx_export_path)
-        self.save_local_artifact("model_step_export", onnx_export_path)
 
-        self.output_dict["fifosizing_testresults"] = self.step_test_fifosizing(onnx_export_path, build_dir)
-        self.save_local_artifact("build_output", build_dir) # might be unnecessary to save this
+# # custom steps
+# from custom_steps import (
+#     step_extract_absorb_bias,
+#     step_pre_streamline,
+#     step_residual_convert_to_hw,
+#     step_residual_streamline,
+#     step_residual_tidy,
+#     step_residual_topo,
+#     step_set_preferred_impl_style,
+#     step_convert_final_layers
+# )
 
-        #TODO: move to base class of bench.py for all DUTs
-        if self.debug:
-            # Save entire FINN tmp build dir for debugging
-            self.save_local_artifact("finn_tmp", os.environ["FINN_BUILD_DIR"])
-            self.save_local_artifact("finn_cwd", os.path.join(os.environ["PATH_WORKDIR"], "finn"))
-            #TODO: save as early as possible or regardless of errors
+# TODO: put these definitions into separate files/classes so we can use them for other types of benchmaks as well
+class bench_metafi_fifosizing(bench_fifosizing):
+    def step_build_setup(self, build_dir):
+        # create build config for MetaFi models
+
+        steps = [
+            # step_residual_tidy,
+            # step_extract_absorb_bias,
+            # step_residual_topo,
+            # step_pre_streamline,
+            # step_residual_streamline,
+            # step_residual_convert_to_hw,
+            "step_create_dataflow_partition",
+            # step_set_preferred_impl_style,
+            "step_specialize_layers",
+            "step_target_fps_parallelization",
+            "step_apply_folding_config",
+            "step_minimize_bit_width",
+            "step_generate_estimate_reports",
+            "step_hw_codegen",
+            "step_hw_ipgen",
+            "step_set_fifo_depths",
+            "step_create_stitched_ip",
+            "step_measure_rtlsim_performance",
+            "step_out_of_context_synthesis",
+            "step_synthesize_bitfile",
+            "step_make_pynq_driver",
+            "step_deployment_package",
+        ]
+
+        build_cfg = build_cfg.DataflowBuildConfig(
+            steps=steps,
+            output_dir=build_dir,
+            verbose=False,
+            synth_clk_period_ns=self.clock_period_ns,
+            target_fps=None, #23
+            board=self.board,
+            shell_flow_type=build_cfg.ShellFlowType.VIVADO_ZYNQ,
+            #vitis_platform=vitis_platform,
+
+            auto_fifo_depths=False,
+            split_large_fifos=False, # probably needed #TODO: account for this in FIFO reduction test
+
+            # general rtlsim settings
+            force_python_rtlsim=False,
+            rtlsim_batch_size=self.params["rtlsim_n"],
+
+            use_conv_rtl = True,  # use rtl for conv layers (MVAU cannot use rtl in our model)
+            # folding_config_file=folding_config_file,
+            # folding_config_file="/home/rz/project/finn-examples/build/vgg10-radioml/folding_config/auto_folding_config.json",
+            # specialize_layers_config_file = "output_%s_%s" % (model_name, release_platform_name) + "/template_specialize_layers_config.json",
+            # specialize_layers_config_file = "/home/rz/project/finn-examples/build/vgg10-radioml/specialize_layers_config/template_specialize_layers_config.json",
+            auto_fifo_strategy="characterize",
+            characteristic_function_strategy=self.params["strategy"],
+            #large_fifo_mem_style=build_cfg.LargeFIFOMemStyle.AUTO,
+            # standalone_thresholds=True,
+            # enable extra performance optimizations (physopt)
+            vitis_opt_strategy=build_cfg.VitisOptStrategyCfg.PERFORMANCE_BEST,
+            generate_outputs=[
+                build_cfg.DataflowOutputType.ESTIMATE_REPORTS,
+                build_cfg.DataflowOutputType.STITCHED_IP,
+                build_cfg.DataflowOutputType.RTLSIM_PERFORMANCE,
+            ],
+        )
+
+        return build_cfg

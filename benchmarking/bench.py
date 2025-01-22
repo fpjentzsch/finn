@@ -10,14 +10,14 @@ from dut.mvau import bench_mvau
 from dut.transformer import bench_transformer
 from dut.transformer_radioml import bench_transformer_radioml
 from dut.transformer_gpt import bench_transformer_gpt
-from dut.fifosizing import bench_fifosizing
+from dut.fifosizing import bench_fifosizing, bench_metafi_fifosizing
+
 
 def main(config_name):
     exit_code = 0
     # Attempt to work around onnxruntime issue on Slurm-managed clusters:
     # See https://github.com/microsoft/onnxruntime/issues/8313
     # This seems to happen only when assigned CPU cores are not contiguous
-    # TODO: add this to test suite as well, errors were observed there too
     _default_session_options = ort.capi._pybind_state.get_default_session_options()
     def get_default_session_options_new():
         _default_session_options.inter_op_num_threads = 1
@@ -127,6 +127,7 @@ def main(config_name):
         log_dict = {"run_id": run_id, "task_id": task_id, "params": params}
 
         # Determine which DUT to run TODO: do this lookup more generically?
+        # give bench subclass name directly in config?
         if config_select.startswith("mvau"):
             bench_object = bench_mvau(params, task_id, run_id, artifacts_dir, save_dir)
         elif config_select.startswith("transformer_radioml"):
@@ -137,6 +138,8 @@ def main(config_name):
             bench_object = bench_transformer(params, task_id, run_id, artifacts_dir, save_dir)
         elif config_select.startswith("fifosizing"):
             bench_object = bench_fifosizing(params, task_id, run_id, artifacts_dir, save_dir)
+        elif config_select.startswith("metafi_fifosizing"):
+            bench_object = bench_metafi_fifosizing(params, task_id, run_id, artifacts_dir, save_dir)
         else:
             print("ERROR: unknown DUT specified")
 

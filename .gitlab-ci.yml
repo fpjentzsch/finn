@@ -52,7 +52,7 @@ Trigger Benchmark Suite:
       pipeline_variables: true
   parallel:
     matrix:
-      - BENCH_CFG: [mvau_test, fifosizing_test, transformer_test, transformer_radioml_all]
+      - BENCH_CFG: [mvau_test, fifosizing_test, transformer_test, transformer_radioml_all, metafi_fifosizing_test]
 
 #TODO: introduce result collect job on parent level for easier visualization/excel interfacing
 #TODO: more control via (optional) variables

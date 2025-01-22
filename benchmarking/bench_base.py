@@ -887,6 +887,10 @@ class bench():
             onnx_path = os.path.join(model_dir, "model.onnx")
             input_npy_path = os.path.join(model_dir, "inp.npy")
             output_npy_path = os.path.join(model_dir, "out.npy")
+        elif "model_path" in self.params:
+            #TODO alternative definition
+            #TODO allow passing of folding config, specialize cfg, etc.
+            pass
         else:
             # input ONNX model will be generated
             onnx_path = os.path.join(tmp_buildflow_dir, "model_export.onnx")
@@ -895,7 +899,17 @@ class bench():
             self.step_export_onnx(onnx_path)
             self.save_local_artifact("model_step_export", onnx_path)
 
-        self.step_build(onnx_path, input_npy_path, output_npy_path, build_dir)
+        if "folding_path" in self.params:
+            folding_path = self.params["folding_path"]
+        else:
+            folding_path = None
+
+        if "specialize_path" in self.params:
+            specialize_path = self.params["specialize_path"]
+        else:
+            specialize_path = None
+
+        self.step_build(self, onnx_path, input_npy_path, output_npy_path, folding_path, specialize_path, build_dir)
         self.save_local_artifact("build_output", build_dir)
         if self.debug:
             # Save entire FINN tmp build dir for debugging

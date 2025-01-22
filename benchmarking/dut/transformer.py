@@ -849,7 +849,7 @@ class bench_transformer(bench):
                     opset_version = 14, 
                     do_constant_folding = True)
 
-    def step_build(self, input_onnx_path, input_npy_path, output_npy_path, output_dir):
+    def step_build(self, input_onnx_path, input_npy_path, output_npy_path, folding_path, specialize_path, output_dir):
         #with open("params.yaml") as file:
         #    params = yaml.safe_load(file)
         # Seed all RNGs
