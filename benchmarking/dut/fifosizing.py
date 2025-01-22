@@ -286,7 +286,7 @@ class bench_fifosizing(bench):
     def step_build_setup(self, build_dir):
         # create build config for synthetic test models
 
-        build_cfg = build_cfg.DataflowBuildConfig(
+        cfg = build_cfg.DataflowBuildConfig(
             output_dir=build_dir,
             verbose=False,
             # only works with characterization-based FIFO-sizing
@@ -309,11 +309,11 @@ class bench_fifosizing(bench):
             ],
         )
 
-        return build_cfg
+        return cfg
     
-    def step_fifotest(self, onnx_path, build_cfg, build_dir):
+    def step_fifotest(self, onnx_path, cfg, build_dir):
         log = {}
-        build.build_dataflow_cfg(onnx_path, build_cfg)
+        build.build_dataflow_cfg(onnx_path, cfg)
 
         # load performance reports
         with open(build_dir + "/report/estimate_network_performance.json") as f:
@@ -383,9 +383,9 @@ class bench_fifosizing(bench):
             model.save(tmp_output_dir_var + "/model.onnx")
 
             # build again, only re-run necessary steps to save time
-            build_cfg.output_dir = tmp_output_dir_var
-            build_cfg.steps = ["step_hw_codegen", "step_create_stitched_ip", "step_measure_rtlsim_performance"]
-            build.build_dataflow_cfg(tmp_output_dir_var + "/model.onnx", build_cfg)
+            cfg.output_dir = tmp_output_dir_var
+            cfg.steps = ["step_hw_codegen", "step_create_stitched_ip", "step_measure_rtlsim_performance"]
+            build.build_dataflow_cfg(tmp_output_dir_var + "/model.onnx", cfg)
 
             # load performance report
             with open(tmp_output_dir_var + "/report/rtlsim_performance.json") as f:
@@ -421,12 +421,12 @@ class bench_fifosizing(bench):
         # TODO: rename steps to model three phases: model creation/import, dataflow build, analysis
         # dataflow build should be easily swappable and adpaptable to finn-examples
         # TODO: put more variables into (base) class instead of function parameters
-        build_cfg = self.step_build_setup(build_dir)
+        cfg = self.step_build_setup(build_dir)
         if folding_path is not None:
-            build_cfg.folding_config_file = folding_path
+            cfg.folding_config_file = folding_path
         if specialize_path is not None:
-            build_cfg.specialize_layers_config_file = specialize_path
-        self.step_fifotest(onnx_export_path, build_cfg, build_dir)
+            cfg.specialize_layers_config_file = specialize_path
+        self.step_fifotest(onnx_export_path, cfg, build_dir)
 
     def step_parse_builder_output(self, build_dir):
         # build output itself is not relevant here (yet)
@@ -478,7 +478,7 @@ class bench_metafi_fifosizing(bench_fifosizing):
             "step_deployment_package",
         ]
 
-        build_cfg = build_cfg.DataflowBuildConfig(
+        cfg = build_cfg.DataflowBuildConfig(
             steps=steps,
             output_dir=build_dir,
             verbose=False,
@@ -513,4 +513,4 @@ class bench_metafi_fifosizing(bench_fifosizing):
             ],
         )
 
-        return build_cfg
+        return cfg
