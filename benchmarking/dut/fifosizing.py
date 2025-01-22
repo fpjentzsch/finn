@@ -495,7 +495,6 @@ class bench_metafi_fifosizing(bench_fifosizing):
             force_python_rtlsim=False,
             rtlsim_batch_size=self.params["rtlsim_n"],
 
-            use_conv_rtl = True,  # use rtl for conv layers (MVAU cannot use rtl in our model)
             # folding_config_file=folding_config_file,
             # folding_config_file="/home/rz/project/finn-examples/build/vgg10-radioml/folding_config/auto_folding_config.json",
             # specialize_layers_config_file = "output_%s_%s" % (model_name, release_platform_name) + "/template_specialize_layers_config.json",
@@ -512,5 +511,8 @@ class bench_metafi_fifosizing(bench_fifosizing):
                 build_cfg.DataflowOutputType.RTLSIM_PERFORMANCE,
             ],
         )
+
+        # where is this used and why?
+        cfg.use_conv_rtl = True,  # use rtl for conv layers (MVAU cannot use rtl in our model)
 
         return cfg
