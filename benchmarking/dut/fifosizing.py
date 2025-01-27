@@ -28,7 +28,7 @@ from util import summarize_table, summarize_section, power_xml_to_dict, prepare_
 from finn.util.test import get_trained_network_and_ishape
 from finn.util.basic import alveo_default_platform
 
-from resnet50_custom_steps import (
+from dut.resnet50_custom_steps import (
         step_resnet50_tidy,
         step_resnet50_streamline,
         step_resnet50_convert_to_hw,
