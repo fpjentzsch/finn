@@ -296,6 +296,8 @@ class bench_fifosizing(bench):
         # create build config for synthetic test models
 
         cfg = build_cfg.DataflowBuildConfig(
+            output_dir = self.build_inputs["build_dir"],
+            synth_clk_period_ns = self.clock_period_ns,
             verbose=False,
             # only works with characterization-based FIFO-sizing
             auto_fifo_depths=True,
@@ -427,9 +429,7 @@ class bench_fifosizing(bench):
         # TODO: rename steps to model three phases: model creation/import, dataflow build, analysis
         # dataflow build should be easily swappable and adpaptable to finn-examples
         cfg = self.step_build_setup()
-        cfg.output_dir = self.build_inputs["build_dir"]
         cfg.board = self.board
-        cfg.synth_clk_period_ns = self.clock_period_ns
         if "folding_path" in self.build_inputs:
             cfg.folding_config_file = self.build_inputs["folding_path"]
         if "specialize_path" in self.build_inputs:
@@ -487,6 +487,8 @@ class bench_metafi_fifosizing(bench_fifosizing):
         ]
 
         cfg = build_cfg.DataflowBuildConfig(
+            output_dir = self.build_inputs["build_dir"],
+            synth_clk_period_ns = self.clock_period_ns,
             steps=steps,
             verbose=False,
             target_fps=None, #23
@@ -550,6 +552,8 @@ class bench_resnet50_fifosizing(bench_fifosizing):
         ]
 
         cfg = build_cfg.DataflowBuildConfig(
+            output_dir = self.build_inputs["build_dir"],
+            synth_clk_period_ns = self.clock_period_ns,
             steps=resnet50_build_steps,
             shell_flow_type=build_cfg.ShellFlowType.VITIS_ALVEO, # TODO: generalize/adapt to new back-end
             auto_fifo_depths=False,
