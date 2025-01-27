@@ -841,6 +841,7 @@ class bench_transformer(bench):
         # Compute attention output
         o = model(x)
         # Save the input and output data for verification purposes later
+        # TODO: go via self.build_inputs["input_npy_path"]
         np.save("inp.npy", x.detach().numpy())
         np.save("out.npy", o.detach().numpy())
         # Export the model graph to QONNX
@@ -849,7 +850,7 @@ class bench_transformer(bench):
                     opset_version = 14, 
                     do_constant_folding = True)
 
-    def step_build(self, input_onnx_path, input_npy_path, output_npy_path, folding_path, specialize_path, output_dir):
+    def step_build(self):
         #with open("params.yaml") as file:
         #    params = yaml.safe_load(file)
         # Seed all RNGs
@@ -878,7 +879,7 @@ class bench_transformer(bench):
         cfg = build_cfg.DataflowBuildConfig(
             # Unpack the build configuration parameters
             #**params["build"],
-            output_dir = output_dir,
+            output_dir = self.build_inputs["build_dir"],
             stitched_ip_gen_dcp = True,
             synth_clk_period_ns = self.clock_period_ns,
             board = self.board,
@@ -1023,7 +1024,7 @@ class bench_transformer(bench):
         )
         # Run the build process on the dummy attention operator graph
         # TODO: maybe let this function return the cfg only, so it can be modified by bench context
-        build.build_dataflow_cfg(input_onnx_path, cfg)
+        build.build_dataflow_cfg(self.build_inputs["onnx_path"], cfg)
 
     def run(self):
         self.steps_full_build_flow()

@@ -26,6 +26,14 @@ import finn.builder.build_dataflow_config as build_cfg
 from finn.util.basic import make_build_dir
 from util import summarize_table, summarize_section, power_xml_to_dict, prepare_inputs, delete_dir_contents
 from finn.util.test import get_trained_network_and_ishape
+from finn.util.basic import alveo_default_platform
+
+from resnet50_custom_steps import (
+        step_resnet50_tidy,
+        step_resnet50_streamline,
+        step_resnet50_convert_to_hw,
+        step_resnet50_slr_floorplan,
+    )
 
 from bench_base import bench
 
@@ -249,6 +257,7 @@ class bench_fifosizing(bench):
         tmp_output_dir = make_build_dir("tmp_test_fifosizing")
 
         #TODO: generalize FIFO test so it can be used by other FIFO-related unit tests
+        # or make into a build flow output product "fifo_report"
         #TODO: allow manual folding/fifo config as input
 
         #TODO: is a scenario possible where reducing depth of a single FIFO at a time is not sufficient for testing tightness?
@@ -287,7 +296,6 @@ class bench_fifosizing(bench):
         # create build config for synthetic test models
 
         cfg = build_cfg.DataflowBuildConfig(
-            output_dir=build_dir,
             verbose=False,
             # only works with characterization-based FIFO-sizing
             auto_fifo_depths=True,
@@ -299,9 +307,7 @@ class bench_fifosizing(bench):
             # general rtlsim settings
             force_python_rtlsim=False,
             rtlsim_batch_size=self.params["rtlsim_n"],
-            synth_clk_period_ns=self.clock_period_ns,
-            board=self.board,
-            shell_flow_type=build_cfg.ShellFlowType.VIVADO_ZYNQ,
+            shell_flow_type=build_cfg.ShellFlowType.VIVADO_ZYNQ, # TODO: generalize/adapt to new back-end
             generate_outputs=[
                 build_cfg.DataflowOutputType.ESTIMATE_REPORTS,
                 build_cfg.DataflowOutputType.STITCHED_IP,
@@ -417,16 +423,18 @@ class bench_fifosizing(bench):
         
         self.output_dict["fifosizing_testresults"] = log
 
-    def step_build(self, onnx_export_path, input_npy_path, output_npy_path, folding_path, specialize_path, build_dir):
+    def step_build(self):
         # TODO: rename steps to model three phases: model creation/import, dataflow build, analysis
         # dataflow build should be easily swappable and adpaptable to finn-examples
-        # TODO: put more variables into (base) class instead of function parameters
-        cfg = self.step_build_setup(build_dir)
-        if folding_path is not None:
-            cfg.folding_config_file = folding_path
-        if specialize_path is not None:
-            cfg.specialize_layers_config_file = specialize_path
-        self.step_fifotest(onnx_export_path, cfg, build_dir)
+        cfg = self.step_build_setup()
+        cfg.output_dir = self.build_inputs["build_dir"]
+        cfg.board = self.board
+        cfg.synth_clk_period_ns = self.clock_period_ns
+        if "folding_path" in self.build_inputs:
+            cfg.folding_config_file = self.build_inputs["folding_path"]
+        if "specialize_path" in self.build_inputs:
+            cfg.specialize_layers_config_file = self.build_inputs["specialize_path"]
+        self.step_fifotest(self.build_inputs["onnx_path"], cfg, self.build_inputs["build_dir"])
 
     def step_parse_builder_output(self, build_dir):
         # build output itself is not relevant here (yet)
@@ -450,7 +458,7 @@ class bench_fifosizing(bench):
 
 # TODO: put these definitions into separate files/classes so we can use them for other types of benchmaks as well
 class bench_metafi_fifosizing(bench_fifosizing):
-    def step_build_setup(self, build_dir):
+    def step_build_setup(self):
         # create build config for MetaFi models
 
         steps = [
@@ -480,12 +488,9 @@ class bench_metafi_fifosizing(bench_fifosizing):
 
         cfg = build_cfg.DataflowBuildConfig(
             steps=steps,
-            output_dir=build_dir,
             verbose=False,
-            synth_clk_period_ns=self.clock_period_ns,
             target_fps=None, #23
-            board=self.board,
-            shell_flow_type=build_cfg.ShellFlowType.VIVADO_ZYNQ,
+            shell_flow_type=build_cfg.ShellFlowType.VIVADO_ZYNQ, # TODO: generalize/adapt to new back-end
             #vitis_platform=vitis_platform,
 
             auto_fifo_depths=False,
@@ -509,10 +514,59 @@ class bench_metafi_fifosizing(bench_fifosizing):
                 build_cfg.DataflowOutputType.ESTIMATE_REPORTS,
                 build_cfg.DataflowOutputType.STITCHED_IP,
                 build_cfg.DataflowOutputType.RTLSIM_PERFORMANCE,
+                build_cfg.DataflowOutputType.OOC_SYNTH, # not required for FIFO test, include for general testing
             ],
         )
 
         # where is this used and why?
         cfg.use_conv_rtl = True,  # use rtl for conv layers (MVAU cannot use rtl in our model)
+
+        return cfg
+
+
+class bench_resnet50_fifosizing(bench_fifosizing):
+    def step_build_setup(self):
+        # create build config for ResNet-50 (based on finn-examples)
+
+        resnet50_build_steps = [
+            step_resnet50_tidy,
+            step_resnet50_streamline,
+            step_resnet50_convert_to_hw,
+            "step_create_dataflow_partition",
+            "step_specialize_layers",
+            "step_apply_folding_config",
+            "step_minimize_bit_width",
+            "step_generate_estimate_reports",
+            "step_hw_codegen",
+            "step_hw_ipgen",
+            "step_set_fifo_depths",
+            step_resnet50_slr_floorplan,
+            "step_create_stitched_ip", # was not in finn-examples
+            "step_measure_rtlsim_performance", # was not in finn-examples
+            "step_out_of_context_synthesis", # was not in finn-examples
+            "step_synthesize_bitfile",
+            "step_make_pynq_driver",
+            "step_deployment_package",
+        ]
+
+        cfg = build_cfg.DataflowBuildConfig(
+            steps=resnet50_build_steps,
+            shell_flow_type=build_cfg.ShellFlowType.VITIS_ALVEO, # TODO: generalize/adapt to new back-end
+            auto_fifo_depths=False,
+            split_large_fifos=True,
+            vitis_platform=alveo_default_platform[self.board], # TODO: generalize/adapt to new back-end
+
+            # enable extra performance optimizations (physopt)
+            vitis_opt_strategy=build_cfg.VitisOptStrategyCfg.PERFORMANCE_BEST,
+            generate_outputs=[
+                build_cfg.DataflowOutputType.ESTIMATE_REPORTS,
+                build_cfg.DataflowOutputType.STITCHED_IP,
+                build_cfg.DataflowOutputType.RTLSIM_PERFORMANCE,
+                build_cfg.DataflowOutputType.OOC_SYNTH, # not required for FIFO test, include for general testing
+            ],
+        )
+
+        # non-standard build parameter for custom step
+        cfg.floorplan_path = self.build_inputs["floorplan_path"]
 
         return cfg

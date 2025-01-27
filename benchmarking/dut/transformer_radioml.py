@@ -157,13 +157,13 @@ defaults:
 """
 
 class bench_transformer_radioml(bench):
-    def step_build(self, input_onnx_path, input_npy_path, output_npy_path, folding_path, specialize_path, output_dir):
+    def step_build(self):
         #with open("params.yaml") as file:
         #    params = yaml.safe_load(file)
         # Seed all RNGs
         seed(self.params["seed"])
         # Extract sequence length and embedding dimension from parameters
-        _, seq_len, emb_dim = np.load(input_npy_path).shape
+        _, seq_len, emb_dim = np.load(self.build_inputs["input_npy_path"]).shape
 
         # Prepare config files
         # TODO: make configurable
@@ -186,7 +186,7 @@ class bench_transformer_radioml(bench):
         cfg = build_cfg.DataflowBuildConfig(
             # Unpack the build configuration parameters
             #**params["build"],
-            output_dir = output_dir,
+            output_dir = self.build_inputs["build_dir"],
             stitched_ip_gen_dcp = True,
             synth_clk_period_ns = self.clock_period_ns,
             board = self.board,
@@ -223,9 +223,9 @@ class bench_transformer_radioml(bench):
                 build_cfg.VerificationStepType.FOLDED_HLS_CPPSIM,
             ],
             # File with test inputs for verification
-            verify_input_npy=input_npy_path,
+            verify_input_npy=self.build_inputs["input_npy_path"],
             # File with expected test outputs for verification
-            verify_expected_output_npy=output_npy_path,
+            verify_expected_output_npy=self.build_inputs["output_npy_path"],
             # Save the intermediate model graphs
             save_intermediate_models=True,
             # Avoid RTL simulation for setting the FIFO sizes
@@ -330,7 +330,7 @@ class bench_transformer_radioml(bench):
         )
         # Run the build process on the dummy attention operator graph
         # TODO: maybe let this function return the cfg only, so it can be modified by bench context
-        build.build_dataflow_cfg(input_onnx_path, cfg)
+        build.build_dataflow_cfg(self.build_inputs["onnx_path"], cfg)
 
     def run(self):
         self.steps_full_build_flow()

@@ -159,7 +159,7 @@ defaults:
 """
 
 class bench_transformer_gpt(bench):
-    def step_build(self, input_onnx_path, input_npy_path, output_npy_path, folding_path, specialize_path, output_dir):
+    def step_build(self):
         #with open("params.yaml") as file:
         #    params = yaml.safe_load(file)
         # Seed all RNGs
@@ -168,7 +168,7 @@ class bench_transformer_gpt(bench):
         # Extract sequence length and embedding dimension from the output of the
         # first quantizer in the model
         # Note: Embedding and Sequence dimension flip later
-        model = ModelWrapper(input_onnx_path)
+        model = ModelWrapper(self.build_inputs["onnx_path"])
         _, emb_dim, seq_len = model.get_tensor_shape(
             "/emb_add/input_quant/export_handler/Quant_output_0"
         )
@@ -198,7 +198,7 @@ class bench_transformer_gpt(bench):
         cfg = build_cfg.DataflowBuildConfig(
             # Unpack the build configuration parameters
             #**params["build"],
-            output_dir = output_dir,
+            output_dir = self.build_inputs["build_dir"],
             stitched_ip_gen_dcp = True,
             synth_clk_period_ns = self.clock_period_ns,
             board = self.board,
@@ -235,9 +235,9 @@ class bench_transformer_gpt(bench):
                 build_cfg.VerificationStepType.FOLDED_HLS_CPPSIM,
             ],
             # File with test inputs for verification
-            verify_input_npy=input_npy_path,
+            verify_input_npy=self.build_inputs["input_npy_path"],
             # File with expected test outputs for verification
-            verify_expected_output_npy=output_npy_path,
+            verify_expected_output_npy=self.build_inputs["output_npy_path"],
             # Save the intermediate model graphs
             save_intermediate_models=True,
             # Avoid RTL simulation for setting the FIFO sizes
@@ -342,7 +342,7 @@ class bench_transformer_gpt(bench):
         )
         # Run the build process on the dummy attention operator graph
         # TODO: maybe let this function return the cfg only, so it can be modified by bench context
-        build.build_dataflow_cfg(input_onnx_path, cfg)
+        build.build_dataflow_cfg(self.build_inputs["onnx_path"], cfg)
 
     def run(self):
         self.steps_full_build_flow()

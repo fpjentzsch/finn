@@ -13,7 +13,7 @@ variables:
     value: "8"
   PARALLEL_JOBS:
     description: "Number of parallel Slurm array jobs per CI job"
-    value: "8"
+    value: "2"
   SLURM_TIMEOUT:
     description: "Timeout"
     value: "2-0" # [days-hours]
@@ -32,7 +32,7 @@ variables:
 workflow:
   name: '$PIPELINE_NAME'
 
-Trigger Manual Benchmark:
+Bench (Manual):
   stage: trigger_benchmarks
   rules:
     - if: $MANUAL_CFG_PATH != ""
@@ -44,7 +44,7 @@ Trigger Manual Benchmark:
   variables:
     BENCH_CFG: "manual"
 
-Trigger Benchmark Suite:
+Bench:
   stage: trigger_benchmarks
   rules:
     - if: $MANUAL_CFG_PATH == ""

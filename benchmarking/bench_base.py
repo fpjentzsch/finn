@@ -541,9 +541,23 @@ class bench():
         #TODO: setup a logger so output can go to console (with task id prefix) and log simultaneously
 
         # General configuration
-        self.board = "RFSoC2x2"
-        self.part = "xczu28dr-ffvg1517-2-e"  # TODO: make configurable, + Alveo support?
-        self.clock_period_ns = 10
+        # TODO: do not allow multiple targets in a single bench job due to measurement?
+        if "board" in params:
+            self.board = params["board"]
+        else:
+            self.board = "RFSoC2x2"
+
+        if "part" in params:
+            self.part = params["part"]
+        elif self.board in part_map:
+            self.part = part_map[self.board]
+        else:
+            raise Exception("No part specified for board %s" % self.board)
+
+        if "clock_period_ns" in params:
+            self.clock_period_ns = params["clock_period_ns"]
+        else:
+            self.clock_period_ns = 10
 
         # Clear FINN tmp build dir before every run (to avoid excessive ramdisk usage and duplicate debug artifacts)
         print("Clearing FINN BUILD DIR ahead of run")
@@ -566,6 +580,9 @@ class bench():
 
         # Initialize dictionary to collect all benchmark results
         self.output_dict = {}
+
+        # Inputs (e.g., ONNX model, golden I/O pair, folding config, etc.) for custom FINN build flow
+        self.build_inputs = {}
 
         # Collect tuples of (name, source path) to save as local artifacts upon run completion or fail by exception
         self.local_artifacts_collection = []
@@ -886,35 +903,30 @@ class bench():
         tmp_buildflow_dir = os.path.join(os.environ["PATH_WORKDIR"], "buildflow")
         os.makedirs(tmp_buildflow_dir, exist_ok=True)
         delete_dir_contents(tmp_buildflow_dir)
-        build_dir = os.path.join(tmp_buildflow_dir, "build_output")
+        self.build_inputs["build_dir"] = os.path.join(tmp_buildflow_dir, "build_output")
+        self.local_artifacts_collection.append(("build_output", self.build_inputs["build_dir"]))
 
         if "model_dir" in self.params:
             # input ONNX model and verification input/output pairs are provided
             model_dir = self.params["model_dir"]
-            onnx_path = os.path.join(model_dir, "model.onnx")
-            input_npy_path = os.path.join(model_dir, "inp.npy")
-            output_npy_path = os.path.join(model_dir, "out.npy")
+            self.build_inputs["onnx_path"] = os.path.join(model_dir, "model.onnx")
+            self.build_inputs["input_npy_path"] = os.path.join(model_dir, "inp.npy")
+            self.build_inputs["output_npy_path"] = os.path.join(model_dir, "out.npy")
         elif "model_path" in self.params:
-            #TODO alternative definition
-            pass
+            self.build_inputs["onnx_path"] = self.params["model_path"]
         else:
-            # input ONNX model will be generated
-            onnx_path = os.path.join(tmp_buildflow_dir, "model_export.onnx")
-            input_npy_path = None # TODO: generate golden input/output pair for verification
-            output_npy_path = None
-            self.step_export_onnx(onnx_path)
-            self.save_local_artifact("model_step_export", onnx_path)
+            # input ONNX model (+ optional I/O pair for verification) will be generated
+            self.build_inputs["onnx_path"] = os.path.join(tmp_buildflow_dir, "model_export.onnx")
+            self.step_export_onnx(self.build_inputs["onnx_path"])
+            self.save_local_artifact("model_step_export", self.build_inputs["onnx_path"])
 
         if "folding_path" in self.params:
-            folding_path = self.params["folding_path"]
-        else:
-            folding_path = None
-
+            self.build_inputs["folding_path"] = self.params["folding_path"]
         if "specialize_path" in self.params:
-            specialize_path = self.params["specialize_path"]
-        else:
-            specialize_path = None
+            self.build_inputs["specialize_path"] = self.params["specialize_path"]
+        if "floorplan_path" in self.params:
+            self.build_inputs["floorplan_path"] = self.params["floorplan_path"]
 
-        self.step_build(onnx_path, input_npy_path, output_npy_path, folding_path, specialize_path, build_dir)
-        self.local_artifacts_collection.append(("build_output", build_dir))
-        self.step_parse_builder_output(build_dir)
+        self.step_build()
+
+        self.step_parse_builder_output(self.build_inputs["build_dir"])
