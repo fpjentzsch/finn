@@ -22,7 +22,7 @@ FINN Build:
     FINN_SINGULARITY: "$PATH_SINGULARITY_IMG/xilinx/finn_dev.sif"
   before_script:
     - cp -dfR .. $PATH_WORKDIR # Copy to working directory (e.g. RAMdisk)
-    - cd $PATH_WORKDIR/finn
+    - cd $PATH_WORKDIR/finn # TODO: adjust for FINN+
     - module load system singularity
   script:
     - ./run-docker.sh python benchmarking/bench.py $BENCH_CFG

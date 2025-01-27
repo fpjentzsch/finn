@@ -567,6 +567,14 @@ class bench():
         # Initialize dictionary to collect all benchmark results
         self.output_dict = {}
 
+        # Collect tuples of (name, source path) to save as local artifacts upon run completion or fail by exception
+        self.local_artifacts_collection = []
+        if self.debug:
+            # Save entire FINN build dir and working dir
+            # TODO: add option to only save upon exception (in FINN builder or benchmarking infrastructure)
+            self.local_artifacts_collection.append(("finn_tmp", os.environ["FINN_BUILD_DIR"]))
+            self.local_artifacts_collection.append(("finn_cwd", os.environ["FINN_ROOT"]))
+
     def save_artifact(self, name, source_path):
         target_path = os.path.join(self.artifacts_dir, name, "run_%d" % (self.run_id))
         os.makedirs(target_path, exist_ok=True)
@@ -582,6 +590,11 @@ class bench():
             copytree(source_path, target_path, dirs_exist_ok=True)
         else:
             shcopy(source_path, target_path)
+
+    def save_local_artifacts_collection(self):
+        # this should be called upon successful or failed completion of a run
+        for (name, source_path) in self.local_artifacts_collection:
+            self.save_local_artifact(name, source_path)
 
     def step_make_model(self):
         # may be implemented in subclass
@@ -865,12 +878,6 @@ class bench():
         if do_synth_power:
             self.step_synth_power()
 
-        if self.debug:
-            # Save entire FINN tmp build dir for debugging
-            self.save_local_artifact("finn_tmp", os.environ["FINN_BUILD_DIR"])
-            self.save_local_artifact("finn_cwd", os.path.join(os.environ["PATH_WORKDIR"], "finn"))
-            #TODO: save as early as possible or regardless of errors
-
     def steps_full_build_flow(self):
         # Default step sequence for benchmarking a full FINN builder flow
 
@@ -889,7 +896,6 @@ class bench():
             output_npy_path = os.path.join(model_dir, "out.npy")
         elif "model_path" in self.params:
             #TODO alternative definition
-            #TODO allow passing of folding config, specialize cfg, etc.
             pass
         else:
             # input ONNX model will be generated
@@ -910,11 +916,5 @@ class bench():
             specialize_path = None
 
         self.step_build(onnx_path, input_npy_path, output_npy_path, folding_path, specialize_path, build_dir)
-        self.save_local_artifact("build_output", build_dir)
-        if self.debug:
-            # Save entire FINN tmp build dir for debugging
-            self.save_local_artifact("finn_tmp", os.environ["FINN_BUILD_DIR"])
-            self.save_local_artifact("finn_cwd", os.path.join(os.environ["PATH_WORKDIR"], "finn"))
-            #TODO: save as early as possible or regardless of errors
-
+        self.local_artifacts_collection.append(("build_output", build_dir))
         self.step_parse_builder_output(build_dir)

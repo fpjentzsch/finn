@@ -163,10 +163,12 @@ def main(config_name):
         log_dict["total_time"] = int(time.time() - start_time)
         log_dict["output"] = output_dict
         log.append(log_dict)
-
         # overwrite output log file every time to allow early abort
         with open(log_path, "w") as f:
             json.dump(log, f, indent=2)
+        
+        # save local artifacts of this run (e.g., detailed debug info)
+        bench_object.save_local_artifacts_collection()
     print("Stopping job")
     return exit_code
     #TODO: add additional exit codes (e.g. when some verification within the run failed)?

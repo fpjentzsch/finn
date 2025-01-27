@@ -22,7 +22,7 @@ variables:
     value: ""
   SLURM_PARTITION:
     description: "Slurm partition (e.g., normal, largemem, fpga, gpu)"
-    value: "fpga"
+    value: "normal"
   SLURM_QOS:
     description: "Optional QoS option (include --qos, e.g., --qos express)"
     value: ""
