@@ -254,7 +254,7 @@ def combine_blocks(lb, rb, ifm_dim, ch, pe):
 class bench_fifosizing(bench):
     def step_export_onnx(self, onnx_export_path):
         np.random.seed(0)
-        tmp_output_dir = make_build_dir("tmp_test_fifosizing")
+        tmp_output_dir = make_build_dir("test_fifosizing")
 
         #TODO: generalize FIFO test so it can be used by other FIFO-related unit tests
         # or make into a build flow output product "fifo_report"
