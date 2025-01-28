@@ -904,6 +904,7 @@ class bench():
         os.makedirs(tmp_buildflow_dir, exist_ok=True)
         delete_dir_contents(tmp_buildflow_dir)
         self.build_inputs["build_dir"] = os.path.join(tmp_buildflow_dir, "build_output")
+        os.makedirs(self.build_inputs["build_dir"], exist_ok=True)
         self.local_artifacts_collection.append(("build_output", self.build_inputs["build_dir"]))
 
         if "model_dir" in self.params:

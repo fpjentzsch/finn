@@ -292,7 +292,7 @@ class bench_fifosizing(bench):
         model = combine_blocks(lb, rb, dim, ch, pe=4)
         model.save(onnx_export_path)
 
-    def step_build_setup(self, build_dir):
+    def step_build_setup(self):
         # create build config for synthetic test models
 
         cfg = build_cfg.DataflowBuildConfig(
@@ -475,9 +475,9 @@ class bench_metafi_fifosizing(bench_fifosizing):
             "step_apply_folding_config",
             "step_minimize_bit_width",
             "step_generate_estimate_reports",
+            "step_set_fifo_depths", # was after ipgen step erroneously?
             "step_hw_codegen",
             "step_hw_ipgen",
-            "step_set_fifo_depths",
             "step_create_stitched_ip",
             "step_measure_rtlsim_performance",
             "step_out_of_context_synthesis",
