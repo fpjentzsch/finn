@@ -475,7 +475,7 @@ class bench_metafi_fifosizing(bench_fifosizing):
             "step_apply_folding_config",
             "step_minimize_bit_width",
             "step_generate_estimate_reports",
-            "step_set_fifo_depths", # was after ipgen step erroneously?
+            "step_set_fifo_depths",
             "step_hw_codegen",
             "step_hw_ipgen",
             "step_create_stitched_ip",
@@ -539,9 +539,9 @@ class bench_resnet50_fifosizing(bench_fifosizing):
             "step_apply_folding_config",
             "step_minimize_bit_width",
             "step_generate_estimate_reports",
+            "step_set_fifo_depths",
             "step_hw_codegen",
             "step_hw_ipgen",
-            "step_set_fifo_depths",
             step_resnet50_slr_floorplan,
             "step_create_stitched_ip", # was not in finn-examples
             "step_measure_rtlsim_performance", # was not in finn-examples

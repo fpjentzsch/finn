@@ -1,6 +1,7 @@
 stages:
   - update
   - build
+  - load_deps
   - test
   - trigger_benchmarks
 
@@ -31,6 +32,20 @@ variables:
 
 workflow:
   name: '$PIPELINE_NAME'
+
+Fetch Repos:
+  id_tokens:
+    CI_JOB_JWT:
+      aud: https://git.uni-paderborn.de
+  stage: load_deps
+  tags:
+    - login
+  cache: 
+    key: $CI_COMMIT_SHA
+    paths:
+      - deps
+  script:
+    - ./fetch-repos.sh
 
 Bench (Manual):
   stage: trigger_benchmarks

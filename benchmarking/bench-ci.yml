@@ -26,6 +26,11 @@ FINN Build:
     - module load system singularity
   script:
     - ./run-docker.sh python benchmarking/bench.py $BENCH_CFG
+  cache: 
+    key: $CI_COMMIT_SHA
+    policy: pull
+    paths:
+      - deps
   artifacts:
     name: "bench_artifacts"
     when: always
